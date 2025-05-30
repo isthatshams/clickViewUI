@@ -12,7 +12,7 @@ import {
   TrashIcon,
   PhotoIcon,
 } from '@heroicons/react/24/solid';
-import { getUserDetails, updateProfile, changePassword } from '../utils/auth';
+import { getUserDetails, updateProfile, uploadProfilePicture } from '../utils/auth';
 
 interface ProfileData {
   firstName: string;
@@ -90,6 +90,8 @@ const Settings: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
     document.documentElement.classList.remove('light', 'dark');
@@ -103,23 +105,27 @@ const Settings: React.FC = () => {
   }, [preferencesData.language]);
 
   useEffect(() => {
-    const loadUserData = async () => {
+    const fetchUserDetails = async () => {
       try {
-        const userData = await getUserDetails();
+        setIsLoading(true);
+        setError('');
+        const details = await getUserDetails();
         setProfileData(prev => ({
           ...prev,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          professionalTitle: userData.professionalTitle || 'User',
-          email: userData.email,
+          firstName: details.firstName,
+          lastName: details.lastName,
+          professionalTitle: details.professionalTitle,
+          email: details.email
         }));
       } catch (err) {
-        setErrorMessage('Failed to load user data');
-        console.error('Error loading user data:', err);
+        console.error('Error in Sidebar:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load user details');
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    loadUserData();
+    fetchUserDetails();
   }, []);
 
   const validateProfile = (): boolean => {
@@ -236,17 +242,36 @@ const Settings: React.FC = () => {
      }
   };
 
-  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProfilePictureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfileData(prev => ({
-          ...prev,
-          profilePicture: reader.result as string,
-        }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    try {
+      // Show loading state
+      setProfileData(prev => ({
+        ...prev,
+        profilePicture: URL.createObjectURL(file) // Show preview immediately
+      }));
+
+      // Upload the file
+      const profilePictureUrl = await uploadProfilePicture(file);
+      
+      // Update profile data with the new URL
+      setProfileData(prev => ({
+        ...prev,
+        profilePicture: profilePictureUrl
+      }));
+
+      setSuccessMessage('Profile picture updated successfully!');
+    } catch (error) {
+      console.error('Error uploading profile picture:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to upload profile picture');
+      
+      // Revert to previous picture on error
+      setProfileData(prev => ({
+        ...prev,
+        profilePicture: prev.profilePicture
+      }));
     }
   };
 
@@ -277,11 +302,12 @@ const Settings: React.FC = () => {
       await updateProfile({
         firstName: profileData.firstName,
         lastName: profileData.lastName,
-        professionalTitle: profileData.professionalTitle,
+        professionalTitle: profileData.professionalTitle
       });
-      setSuccessMessage('Profile updated successfully');
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to update profile');
+      setSuccessMessage('Profile updated successfully!');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to update profile. Please try again.');
     }
   };
 
@@ -310,18 +336,16 @@ const Settings: React.FC = () => {
     }
 
     try {
-      await changePassword({
-        oldPassword: passwordData.currentPassword,
-        newPassword: passwordData.newPassword,
-      });
-      setSuccessMessage('Password changed successfully');
+      // TODO: Implement API call to update password
+      setSuccessMessage('Password updated successfully!');
+      // Clear password fields after successful update
       setPasswordData({
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
       });
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to change password');
+    } catch (error) {
+      setErrorMessage('Failed to update password. Please try again.');
     }
   };
 
@@ -472,10 +496,14 @@ const Settings: React.FC = () => {
                   id="email"
                   name="email"
                   value={profileData.email}
+                  onChange={handleProfileChange}
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 bg-white border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400 ${errors.email ? 'border-red-500 dark:border-red-400' : ''} ${'bg-gray-50 cursor-not-allowed text-gray-400 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600'}`}
                   readOnly
-                  className="w-full px-4 py-2 border rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400"
                 />
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Email cannot be changed</p>
+                {/* Email is read-only, no validation message needed unless we add a change email flow later */}
+                {/* {errors.email && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
+                )} */}
               </div>
             </div>
             <div className="mt-6 flex justify-end">

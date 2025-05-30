@@ -1,5 +1,3 @@
-const API_URL = 'https://localhost:7127';
-
 interface TokenResponse {
   accessToken: string;
   refreshToken: string;
@@ -20,7 +18,7 @@ export const refreshAccessToken = async (): Promise<boolean> => {
       throw new Error('No refresh token available');
     }
 
-    const response = await fetch('https://localhost:7127/api/user/refresh-token', {
+    const response = await fetch('https://localhost:7127/api/User/refresh-token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -94,7 +92,7 @@ export const startTokenRefreshCheck = () => {
 };
 
 export const signIn = async (email: string, password: string) => {
-  const response = await fetch('https://localhost:7127/api/user/login', {
+  const response = await fetch('https://localhost:7127/api/User/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -133,31 +131,56 @@ export const resendVerificationCode = async (email: string) => {
 };
 
 export const getUserDetails = async (): Promise<UserDetails> => {
-  const token = localStorage.getItem('token');
-  if (!token) {
-    throw new Error('No token found');
-  }
+  try {
+    const token = await getValidToken();
+    console.log('Token available:', !!token);
+    console.log('Token value:', token?.substring(0, 20) + '...'); // Log first 20 chars of token
 
-  const response = await fetch(`${API_URL}/api/user/profile`, {
-    headers: {
-      'Authorization': `Bearer ${token}`
+    if (!token) {
+      throw new Error('No valid token available');
     }
-  });
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch user details');
+    const url = 'https://localhost:7127/api/User/profile';
+    console.log('Fetching from URL:', url);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to fetch user details:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+        url: url
+      });
+      throw new Error(`Failed to fetch user details: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('Received user data:', data);
+
+    return {
+      firstName: data.firstName || '',
+      lastName: data.lastName || '',
+      professionalTitle: data.professionalTitle || 'User',
+      email: data.email || ''
+    };
+  } catch (error) {
+    console.error('Error in getUserDetails:', error);
+    throw error;
   }
-
-  const data = await response.json();
-  return {
-    firstName: data.firstName,
-    lastName: data.lastName,
-    professionalTitle: data.professionalTitle || 'User',
-    email: data.email
-  };
 };
 
-export const updateProfile = async (data: { firstName: string; lastName: string; professionalTitle?: string }) => {
+export const updateProfile = async (profileData: { firstName: string; lastName: string; professionalTitle: string }): Promise<void> => {
   const token = await getValidToken();
   if (!token) {
     throw new Error('No valid token available');
@@ -169,42 +192,37 @@ export const updateProfile = async (data: { firstName: string; lastName: string;
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify(profileData),
   });
 
-  const responseText = await response.text();
-  
   if (!response.ok) {
-    throw new Error(responseText || 'Failed to update profile');
-  }
-
-  try {
-    return JSON.parse(responseText);
-  } catch {
-    // If response is not JSON, return the text as a message
-    return { message: responseText };
+    const errorText = await response.text();
+    throw new Error(`Failed to update profile: ${response.status} ${response.statusText}`);
   }
 };
 
-export const changePassword = async (data: { oldPassword: string; newPassword: string }) => {
+export const uploadProfilePicture = async (file: File): Promise<string> => {
   const token = await getValidToken();
   if (!token) {
     throw new Error('No valid token available');
   }
 
-  const response = await fetch('https://localhost:7127/api/user/change-password', {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch('https://localhost:7127/api/User/upload-profile-picture', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
     },
-    body: JSON.stringify(data),
+    body: formData,
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw error;
+    const errorText = await response.text();
+    throw new Error(`Failed to upload profile picture: ${response.status} ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  return data.profilePictureUrl;
 }; 

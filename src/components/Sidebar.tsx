@@ -25,16 +25,21 @@ const Sidebar: React.FC = () => {
   const { isSidebarOpen, toggleSidebar } = useSidebar();
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const location = useLocation();
 
   useEffect(() => {
     const fetchUserDetails = async () => {
       try {
+        setIsLoading(true);
+        setError('');
         const details = await getUserDetails();
         setUserDetails(details);
       } catch (err) {
-        setError('Failed to load user details');
-        console.error('Error fetching user details:', err);
+        console.error('Error in Sidebar:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load user details');
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -76,24 +81,35 @@ const Sidebar: React.FC = () => {
       {/* User Info */}
       {isSidebarOpen && (
         <div className="flex items-center p-4 border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-          {userDetails ? (
+          {isLoading ? (
+            <div className="animate-pulse">
+              <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+            </div>
+          ) : error ? (
+            <div className="text-sm text-red-600">
+              <p>{error}</p>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="text-blue-600 hover:text-blue-800 mt-2"
+              >
+                Retry
+              </button>
+            </div>
+          ) : userDetails ? (
             <>
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base mr-3">
                 {userDetails.firstName.charAt(0)}
                 {userDetails.lastName.charAt(0)}
               </div>
               <div>
-                <p className="text-base font-semibold text-gray-800 dark:text-white">
+                <h2 className="text-lg font-semibold text-gray-800">
                   {userDetails.firstName} {userDetails.lastName}
-                </p>
+                </h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">{userDetails.professionalTitle}</p>
               </div>
             </>
-          ) : error ? (
-            <p className="text-sm text-red-600">{error}</p>
-          ) : (
-            <p className="text-sm text-gray-600">Loading...</p>
-          )}
+          ) : null}
         </div>
       )}
 
