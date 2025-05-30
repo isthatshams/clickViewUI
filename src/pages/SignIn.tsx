@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import logoImage from '../assets/Logo Written.png';
 import visualLogoImage from '../assets/Logo Visualed.png';
 import googleIcon from '../assets/google.svg';
+import { signIn } from '../utils/auth';
 
 const SignIn: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -13,8 +14,10 @@ const SignIn: React.FC = () => {
   const [errors, setErrors] = useState({
     email: '',
     password: '',
+    submit: '',
   });
 
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const validateField = useCallback((name: string, value: string) => {
@@ -68,7 +71,7 @@ const SignIn: React.FC = () => {
     }));
   };
 
-   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     const error = validateField(name, value);
     setErrors(prev => ({
@@ -77,15 +80,24 @@ const SignIn: React.FC = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateForm()) {
-      // Handle form submission here (e.g., send data to backend)
-      console.log('Form submitted successfully:', formData);
-      // Redirect to dashboard on successful sign-in
+    setErrors(prev => ({ ...prev, submit: '' }));
+    
+    try {
+      await signIn(formData.email, formData.password);
       navigate('/dashboard');
-    } else {
-      console.log('Form has errors');
+    } catch (err: any) {
+      if (err.requiresVerification) {
+        // Store password temporarily for use after verification
+        localStorage.setItem('tempPassword', formData.password);
+        navigate('/two-factor-auth', { state: { userEmail: formData.email } });
+      } else {
+        setErrors(prev => ({
+          ...prev,
+          submit: err.message || 'Failed to sign in'
+        }));
+      }
     }
   };
 
@@ -118,6 +130,11 @@ const SignIn: React.FC = () => {
         </div>
 
         <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+          {errors.submit && (
+            <div className="rounded-md bg-red-50 p-4">
+              <div className="text-sm text-red-700">{errors.submit}</div>
+            </div>
+          )}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
               Email address <span className="text-red-500 ml-1">*</span>
@@ -135,6 +152,7 @@ const SignIn: React.FC = () => {
               value={formData.email}
               onChange={handleChange}
               onBlur={handleBlur}
+              disabled={isLoading}
             />
             {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
           </div>
@@ -156,6 +174,7 @@ const SignIn: React.FC = () => {
               value={formData.password}
               onChange={handleChange}
               onBlur={handleBlur}
+              disabled={isLoading}
             />
             {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
           </div>
@@ -169,9 +188,10 @@ const SignIn: React.FC = () => {
           <div>
             <button
               type="submit"
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200"
+              disabled={isLoading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200 disabled:opacity-50"
             >
-              Sign In
+              {isLoading ? 'Signing in...' : 'Sign In'}
             </button>
           </div>
         </form>
@@ -185,7 +205,8 @@ const SignIn: React.FC = () => {
         <div>
           <button
             type="button"
-            className="w-full flex items-center justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200"
+            disabled={isLoading}
+            className="w-full flex items-center justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200 disabled:opacity-50"
           >
              <span className="mr-2 flex items-center">
                <img src={googleIcon} alt="Google Icon" className="h-4 w-4" />

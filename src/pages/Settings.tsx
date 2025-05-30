@@ -12,6 +12,7 @@ import {
   TrashIcon,
   PhotoIcon,
 } from '@heroicons/react/24/solid';
+import { getUserDetails, updateProfile, changePassword } from '../utils/auth';
 
 interface ProfileData {
   firstName: string;
@@ -51,11 +52,11 @@ interface FormErrors {
 const Settings: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [profileData, setProfileData] = useState<ProfileData>({
-    firstName: 'Helmi',
-    lastName: 'Nofal',
-    email: 'helmi@example.com',
+    firstName: '',
+    lastName: '',
+    email: '',
     profilePicture: null,
-    professionalTitle: 'Front-End Developer',
+    professionalTitle: '',
   });
 
   const [passwordData, setPasswordData] = useState<PasswordData>({
@@ -100,6 +101,26 @@ const Settings: React.FC = () => {
     localStorage.setItem('language', preferencesData.language);
     // TODO: Implement actual language change logic if needed
   }, [preferencesData.language]);
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const userData = await getUserDetails();
+        setProfileData(prev => ({
+          ...prev,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          professionalTitle: userData.professionalTitle || 'User',
+          email: userData.email,
+        }));
+      } catch (err) {
+        setErrorMessage('Failed to load user data');
+        console.error('Error loading user data:', err);
+      }
+    };
+
+    loadUserData();
+  }, []);
 
   const validateProfile = (): boolean => {
     const newErrors: FormErrors = {};
@@ -253,10 +274,14 @@ const Settings: React.FC = () => {
     }
 
     try {
-      // TODO: Implement API call to update profile
-      setSuccessMessage('Profile updated successfully!');
-    } catch (error) {
-      setErrorMessage('Failed to update profile. Please try again.');
+      await updateProfile({
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        professionalTitle: profileData.professionalTitle,
+      });
+      setSuccessMessage('Profile updated successfully');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to update profile');
     }
   };
 
@@ -285,16 +310,18 @@ const Settings: React.FC = () => {
     }
 
     try {
-      // TODO: Implement API call to update password
-      setSuccessMessage('Password updated successfully!');
-      // Clear password fields after successful update
+      await changePassword({
+        oldPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      });
+      setSuccessMessage('Password changed successfully');
       setPasswordData({
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
       });
-    } catch (error) {
-      setErrorMessage('Failed to update password. Please try again.');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to change password');
     }
   };
 
@@ -445,14 +472,10 @@ const Settings: React.FC = () => {
                   id="email"
                   name="email"
                   value={profileData.email}
-                  onChange={handleProfileChange}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 bg-white border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400 ${errors.email ? 'border-red-500 dark:border-red-400' : ''} ${'bg-gray-50 cursor-not-allowed text-gray-400 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600'}`}
                   readOnly
+                  className="w-full px-4 py-2 border rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400"
                 />
-                {/* Email is read-only, no validation message needed unless we add a change email flow later */}
-                {/* {errors.email && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
-                )} */}
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Email cannot be changed</p>
               </div>
             </div>
             <div className="mt-6 flex justify-end">

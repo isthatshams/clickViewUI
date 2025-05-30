@@ -255,7 +255,7 @@ html:not(.dark) .border-purple-500 {
 
 html:not(.dark) .hover\:bg-purple-50:hover {
   background-color: #f5f3ff !important;
-}
+  }
 
 html:not(.dark) .hover\:bg-purple-100:hover {
   background-color: #ede9fe !important;
@@ -280,7 +280,7 @@ html:not(.dark) .hover\:bg-purple-100:hover {
 
 .dark .hover\:bg-purple-50:hover {
   background-color: #4c1d95 !important;
-}
+  }
 
 .dark .hover\:bg-purple-100:hover {
   background-color: #5b21b6 !important;

@@ -18,6 +18,7 @@ const SignUp: React.FC = () => {
     lastName: '',
     email: '',
     password: '',
+    submit: '',
   });
 
   const navigate = useNavigate();
@@ -100,13 +101,50 @@ const SignUp: React.FC = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      // Handle form submission here (e.g., send data to backend)
-      console.log('Form submitted successfully:', formData);
-      // Redirect to Two-Factor Auth page
-      navigate('/two-factor-auth');
+      try {
+        const response = await fetch('https://localhost:7127/api/user/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+            password: formData.password
+          }),
+        });
+        // Check if the response is JSON
+        const contentType = response.headers.get('content-type');
+        let data;
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        }
+
+        if (response.status === 200) {
+          // Success case
+          console.log('Registration successful:', data);
+          // Store email from form data
+          localStorage.setItem('userEmail', formData.email);
+          // Redirect to Two-Factor Auth page
+          navigate('/two-factor-auth');
+        } else if (response.status === 400) {
+          // Handle email already registered error
+          throw new Error('Email is already registered');
+        } else {
+          // Handle other errors
+          throw new Error(data?.message || 'Registration failed');
+        }
+      } catch (error) {
+        console.error('Registration error:', error);
+        setErrors(prev => ({
+          ...prev,
+          submit: error instanceof Error ? error.message : 'Registration failed. Please try again.'
+        }));
+      }
     } else {
       console.log('Form has errors');
     }
@@ -234,6 +272,9 @@ const SignUp: React.FC = () => {
             >
               Sign Up
             </button>
+            {errors.submit && (
+              <p className="mt-2 text-sm text-red-600 text-center">{errors.submit}</p>
+            )}
           </div>
         </form>
 

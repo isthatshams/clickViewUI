@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import visualLogoImage from '../assets/Logo Visualed.png';
 import {
@@ -13,10 +13,33 @@ import {
   ChevronDoubleRightIcon,
 } from '@heroicons/react/24/solid';
 import { useSidebar } from '../context/SidebarContext';
+import { getUserDetails } from '../utils/auth';
+
+interface UserDetails {
+  firstName: string;
+  lastName: string;
+  professionalTitle: string;
+}
 
 const Sidebar: React.FC = () => {
   const { isSidebarOpen, toggleSidebar } = useSidebar();
+  const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
+  const [error, setError] = useState('');
   const location = useLocation();
+
+  useEffect(() => {
+    const fetchUserDetails = async () => {
+      try {
+        const details = await getUserDetails();
+        setUserDetails(details);
+      } catch (err) {
+        setError('Failed to load user details');
+        console.error('Error fetching user details:', err);
+      }
+    };
+
+    fetchUserDetails();
+  }, []);
 
   return (
     <div className={`fixed inset-y-0 left-0 z-40 bg-white shadow-lg flex flex-col border-r border-gray-200 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'w-64 translate-x-0' : 'w-0 -translate-x-full'} lg:static lg:translate-x-0 lg:transition-all ${isSidebarOpen ? 'lg:w-64' : 'lg:w-20'} overflow-hidden dark:bg-gray-800 dark:border-gray-700`}>
@@ -53,13 +76,24 @@ const Sidebar: React.FC = () => {
       {/* User Info */}
       {isSidebarOpen && (
         <div className="flex items-center p-4 border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base mr-3">
-            HN
-          </div>
-          <div>
-            <p className="text-base font-semibold text-gray-800 dark:text-white">Helmi Nofal</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Front-End Dev</p>
-          </div>
+          {userDetails ? (
+            <>
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base mr-3">
+                {userDetails.firstName.charAt(0)}
+                {userDetails.lastName.charAt(0)}
+              </div>
+              <div>
+                <p className="text-base font-semibold text-gray-800 dark:text-white">
+                  {userDetails.firstName} {userDetails.lastName}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{userDetails.professionalTitle}</p>
+              </div>
+            </>
+          ) : error ? (
+            <p className="text-sm text-red-600">{error}</p>
+          ) : (
+            <p className="text-sm text-gray-600">Loading...</p>
+          )}
         </div>
       )}
 

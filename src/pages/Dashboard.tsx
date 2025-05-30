@@ -187,7 +187,7 @@ const Dashboard: React.FC = () => {
               {recentInterviews.slice(0, 4).map((interview) => (
                 <div key={interview.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-200 pb-4 last:border-b-0 dark:border-gray-700">
                   <div className="flex-1 mb-2 sm:mb-0 mr-4">
-                    <p className="text-base font-medium text-gray-900 dark:text-white">{interview.title}</p>
+                    <p className="text-base font-medium text-gray-800 dark:text-white">{interview.title}</p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">{interview.date}</p>
                     {interview.interestingFact && (
                        <p className="text-sm text-gray-600 italic dark:text-gray-500 mt-1">{interview.interestingFact}</p>
