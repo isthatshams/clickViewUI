@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import visualLogoImage from '../assets/Logo Visualed.png';
 import logoImage from '../assets/Logo Written.png';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
-const ForgotPassword: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const navigate = useNavigate();
+const ResetPassword: React.FC = () => {
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  // You might need state for validation errors here as well
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement password reset logic
-    console.log('Reset password for:', email);
-    // Navigate to check email page
-    navigate('/check-email');
+    // TODO: Implement password reset logic (e.g., send token, new password)
+    console.log('New password:', password);
+    console.log('Confirm password:', confirmPassword);
+    // You would typically navigate to a success page or sign-in page after a successful reset
   };
 
   return (
@@ -39,28 +40,47 @@ const ForgotPassword: React.FC = () => {
             />
           </div>
 
-          <h2 className="text-2xl font-semibold text-gray-800">Forgot Password</h2>
+          <h2 className="text-2xl font-semibold text-gray-800">Reset Your Password</h2>
           <p className="text-gray-600 text-sm mt-2">
-            Enter your email address and we'll send you a link to reset your password
+            Enter your new password below.
           </p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div>
-            <label htmlFor="email" className="sr-only">
-              Email address
+            <label htmlFor="password" className="sr-only">
+              New Password
             </label>
             <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="new-password"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm"
-              placeholder="Email address"
+              placeholder="New Password"
             />
+            {/* Add error message here if needed */}
+          </div>
+
+          <div>
+            <label htmlFor="confirm-password" className="sr-only">
+              Confirm Password
+            </label>
+            <input
+              id="confirm-password"
+              name="confirm-password"
+              type="password"
+              autoComplete="new-password"
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm"
+              placeholder="Confirm Password"
+            />
+             {/* Add error message here if needed */}
           </div>
 
           <div>
@@ -68,7 +88,7 @@ const ForgotPassword: React.FC = () => {
               type="submit"
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
             >
-              Send Reset Link
+              Reset Password
             </button>
           </div>
 
@@ -86,4 +106,4 @@ const ForgotPassword: React.FC = () => {
   );
 };
 
-export default ForgotPassword; 
+export default ResetPassword; 
