@@ -7,7 +7,6 @@ import {
   DocumentTextIcon,
   CogIcon,
   ArrowLeftOnRectangleIcon,
-  Bars3Icon,
   XMarkIcon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,

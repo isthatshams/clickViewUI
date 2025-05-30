@@ -115,7 +115,8 @@ const Settings: React.FC = () => {
           firstName: details.firstName,
           lastName: details.lastName,
           professionalTitle: details.professionalTitle,
-          email: details.email
+          email: details.email,
+          profilePicture: details.profilePicture ? `https://localhost:7127${details.profilePicture}` : null
         }));
       } catch (err) {
         console.error('Error in Sidebar:', err);
@@ -247,20 +248,30 @@ const Settings: React.FC = () => {
     if (!file) return;
 
     try {
+      console.log('Starting profile picture upload...');
       // Show loading state
+      const previewUrl = URL.createObjectURL(file);
+      console.log('Preview URL:', previewUrl);
+      
       setProfileData(prev => ({
         ...prev,
-        profilePicture: URL.createObjectURL(file) // Show preview immediately
+        profilePicture: previewUrl // Show preview immediately
       }));
 
       // Upload the file
+      console.log('Uploading file to server...');
       const profilePictureUrl = await uploadProfilePicture(file);
+      console.log('Received profile picture URL:', profilePictureUrl);
       
       // Update profile data with the new URL
-      setProfileData(prev => ({
-        ...prev,
-        profilePicture: profilePictureUrl
-      }));
+      setProfileData(prev => {
+        const fullUrl = `https://localhost:7127${profilePictureUrl}`;
+        console.log('Updating profile data with new URL:', fullUrl);
+        return {
+          ...prev,
+          profilePicture: fullUrl
+        };
+      });
 
       setSuccessMessage('Profile picture updated successfully!');
     } catch (error) {
@@ -410,6 +421,7 @@ const Settings: React.FC = () => {
                       src={profileData.profilePicture}
                       alt="Profile"
                       className="w-24 h-24 rounded-full object-cover"
+                      crossOrigin="anonymous"
                     />
                   ) : (
                     <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center dark:bg-gray-700">

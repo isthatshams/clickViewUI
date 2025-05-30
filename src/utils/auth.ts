@@ -9,6 +9,7 @@ interface UserDetails {
   lastName: string;
   professionalTitle: string;
   email: string;
+  profilePicture: string | null;
 }
 
 export const refreshAccessToken = async (): Promise<boolean> => {
@@ -168,11 +169,13 @@ export const getUserDetails = async (): Promise<UserDetails> => {
     const data = await response.json();
     console.log('Received user data:', data);
 
+    // Return the relative path, let the component handle the full URL
     return {
       firstName: data.firstName || '',
       lastName: data.lastName || '',
       professionalTitle: data.professionalTitle || 'User',
-      email: data.email || ''
+      email: data.email || '',
+      profilePicture: data.profilePicture
     };
   } catch (error) {
     console.error('Error in getUserDetails:', error);
@@ -210,6 +213,7 @@ export const uploadProfilePicture = async (file: File): Promise<string> => {
   const formData = new FormData();
   formData.append('file', file);
 
+  console.log('Uploading profile picture...');
   const response = await fetch('https://localhost:7127/api/User/upload-profile-picture', {
     method: 'POST',
     headers: {
@@ -220,9 +224,12 @@ export const uploadProfilePicture = async (file: File): Promise<string> => {
 
   if (!response.ok) {
     const errorText = await response.text();
+    console.error('Upload failed:', errorText);
     throw new Error(`Failed to upload profile picture: ${response.status} ${response.statusText}`);
   }
 
   const data = await response.json();
+  console.log('Upload response:', data);
+  // Return the relative path, let the component handle the full URL
   return data.profilePictureUrl;
 }; 
