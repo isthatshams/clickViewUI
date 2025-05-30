@@ -55,12 +55,12 @@ const Interviews: React.FC = () => {
 
         {/* Content Area - Mock Interviews List */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Mock Interviews</h2>
+           <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Mock Interviews</h2>
            <div className="space-y-4">
              {mockInterviews.map(interview => (
                <div key={interview.id} className="border-b border-gray-200 dark:border-gray-700 pb-4 last:pb-0 last:border-b-0 flex items-center justify-between">
                  <div>
-                   <p className="text-lg font-medium text-gray-900 dark:text-white">{interview.title}</p>
+                   <p className="text-lg font-medium text-gray-800 dark:text-white">{interview.title}</p>
                    <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 mt-1">
                      <CalendarIcon className="h-4 w-4 mr-1" />
                      <span>{interview.date}</span>
