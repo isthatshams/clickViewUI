@@ -14,13 +14,16 @@ const TwoFactorAuth: React.FC = () => {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const navigate = useNavigate();
   const location = useLocation();
-  const email = location.state?.userEmail;
+  const [email, setEmail] = useState<string>('');
 
   useEffect(() => {
-    if (!email) {
+    const storedEmail = localStorage.getItem('userEmail');
+    if (!storedEmail) {
       navigate('/signin');
+    } else {
+      setEmail(storedEmail);
     }
-  }, [email, navigate]);
+  }, [navigate]);
 
   useEffect(() => {
     let timer: number;
@@ -101,8 +104,14 @@ const TwoFactorAuth: React.FC = () => {
       if (response.ok) {
         // After successful verification, sign in the user
         try {
-          await signIn(email, localStorage.getItem('tempPassword') || '');
+          const password = localStorage.getItem('tempPassword');
+          if (!password) {
+            navigate('/signin');
+            return;
+          }
+          await signIn(email, password);
           localStorage.removeItem('tempPassword');
+          localStorage.removeItem('userEmail');
           navigate('/dashboard');
         } catch (signInError: any) {
           setError(signInError.message || 'Failed to sign in after verification');

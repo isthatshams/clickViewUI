@@ -12,7 +12,7 @@ import {
   TrashIcon,
   PhotoIcon,
 } from '@heroicons/react/24/solid';
-import { getUserDetails, updateProfile, uploadProfilePicture } from '../utils/auth';
+import { getUserDetails, updateProfile, uploadProfilePicture, changePassword, updatePrivacySettings, deleteAccount, getPrivacySettings } from '../utils/auth';
 
 interface ProfileData {
   firstName: string;
@@ -118,6 +118,10 @@ const Settings: React.FC = () => {
           email: details.email,
           profilePicture: details.profilePicture ? `https://localhost:7127${details.profilePicture}` : null
         }));
+
+        // Fetch privacy settings
+        const privacySettings = await getPrivacySettings();
+        setPrivacyData(privacySettings);
       } catch (err) {
         console.error('Error in Sidebar:', err);
         setError(err instanceof Error ? err.message : 'Failed to load user details');
@@ -296,7 +300,7 @@ const Settings: React.FC = () => {
   const handlePrivacyChange = (name: keyof PrivacyData) => {
     setPrivacyData(prev => ({
       ...prev,
-      [name]: !prev[name],
+      [name]: !prev[name]
     }));
   };
 
@@ -347,7 +351,7 @@ const Settings: React.FC = () => {
     }
 
     try {
-      // TODO: Implement API call to update password
+      await changePassword(passwordData.currentPassword, passwordData.newPassword);
       setSuccessMessage('Password updated successfully!');
       // Clear password fields after successful update
       setPasswordData({
@@ -356,17 +360,20 @@ const Settings: React.FC = () => {
         confirmPassword: '',
       });
     } catch (error) {
-      setErrorMessage('Failed to update password. Please try again.');
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to update password. Please try again.');
     }
   };
 
   const handlePrivacySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSuccessMessage('');
+    setErrorMessage('');
+
     try {
-      // TODO: Implement API call to update privacy settings
+      await updatePrivacySettings(privacyData);
       setSuccessMessage('Privacy settings updated successfully!');
     } catch (error) {
-      setErrorMessage('Failed to update privacy settings. Please try again.');
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to update privacy settings. Please try again.');
     }
   };
 
@@ -377,10 +384,10 @@ const Settings: React.FC = () => {
     }
 
     try {
-      // TODO: Implement API call to delete account
-      // Redirect to home page or show confirmation
+      await deleteAccount();
+      // The deleteAccount function will handle the redirect
     } catch (error) {
-      setErrorMessage('Failed to delete account. Please try again.');
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to delete account. Please try again.');
       setIsDeleting(false);
     }
   };

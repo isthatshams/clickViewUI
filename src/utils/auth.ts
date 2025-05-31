@@ -101,13 +101,28 @@ export const signIn = async (email: string, password: string) => {
     body: JSON.stringify({ email, password }),
   });
 
-  if (response.status === 401) {
-    throw { status: 401, message: 'Two-factor authentication required' };
-  }
-
   if (!response.ok) {
-    const error = await response.json();
-    throw error;
+    const contentType = response.headers.get('content-type');
+    let errorMessage;
+    let requiresVerification = false;
+    
+    if (contentType && contentType.includes('application/json')) {
+      const error = await response.json();
+      errorMessage = error.message || 'Login failed';
+      requiresVerification = error.requiresVerification || false;
+    } else {
+      errorMessage = await response.text();
+    }
+    
+    if (requiresVerification) {
+      // Store email for 2FA page
+      localStorage.setItem('userEmail', email);
+      // Redirect to 2FA page
+      window.location.href = '/two-factor-auth';
+      return;
+    }
+    
+    throw { status: response.status, message: errorMessage };
   }
 
   const data = await response.json();
@@ -232,4 +247,96 @@ export const uploadProfilePicture = async (file: File): Promise<string> => {
   console.log('Upload response:', data);
   // Return the relative path, let the component handle the full URL
   return data.profilePictureUrl;
+};
+
+export const changePassword = async (oldPassword: string, newPassword: string): Promise<void> => {
+  const token = await getValidToken();
+  if (!token) {
+    throw new Error('No valid token available');
+  }
+
+  const response = await fetch('https://localhost:7127/api/User/change-password', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      oldPassword,
+      newPassword
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to change password');
+  }
+};
+
+export const updatePrivacySettings = async (settings: { showProfile: boolean; showActivity: boolean; showProgress: boolean }): Promise<void> => {
+  const token = await getValidToken();
+  if (!token) {
+    throw new Error('No valid token available');
+  }
+
+  const response = await fetch('https://localhost:7127/api/User/update-privacy', {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(settings),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to update privacy settings');
+  }
+};
+
+export const deleteAccount = async (): Promise<void> => {
+  const token = await getValidToken();
+  if (!token) {
+    throw new Error('No valid token available');
+  }
+
+  const response = await fetch('https://localhost:7127/api/User/delete-account', {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to delete account');
+  }
+
+  // Clear local storage and redirect to home page
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('tokenExpiry');
+  window.location.href = '/';
+};
+
+export const getPrivacySettings = async (): Promise<{ showProfile: boolean; showActivity: boolean; showProgress: boolean }> => {
+  const token = await getValidToken();
+  if (!token) {
+    throw new Error('No valid token available');
+  }
+
+  const response = await fetch('https://localhost:7127/api/User/privacy-settings', {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to get privacy settings');
+  }
+
+  return response.json();
 }; 

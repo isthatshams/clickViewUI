@@ -117,26 +117,26 @@ const SignUp: React.FC = () => {
             password: formData.password
           }),
         });
-        // Check if the response is JSON
-        const contentType = response.headers.get('content-type');
-        let data;
-        if (contentType && contentType.includes('application/json')) {
-          data = await response.json();
-        }
 
-        if (response.status === 200) {
-          // Success case
-          console.log('Registration successful:', data);
-          // Store email from form data
+        if (response.ok) {
+          // Store email for 2FA page
           localStorage.setItem('userEmail', formData.email);
+          // Store password temporarily for auto sign-in after verification
+          localStorage.setItem('tempPassword', formData.password);
           // Redirect to Two-Factor Auth page
           navigate('/two-factor-auth');
-        } else if (response.status === 400) {
-          // Handle email already registered error
-          throw new Error('Email is already registered');
         } else {
-          // Handle other errors
-          throw new Error(data?.message || 'Registration failed');
+          const contentType = response.headers.get('content-type');
+          let errorMessage;
+          
+          if (contentType && contentType.includes('application/json')) {
+            const error = await response.json();
+            errorMessage = error.message;
+          } else {
+            errorMessage = await response.text();
+          }
+          
+          throw new Error(errorMessage || 'Registration failed');
         }
       } catch (error) {
         console.error('Registration error:', error);
@@ -145,8 +145,6 @@ const SignUp: React.FC = () => {
           submit: error instanceof Error ? error.message : 'Registration failed. Please try again.'
         }));
       }
-    } else {
-      console.log('Form has errors');
     }
   };
 

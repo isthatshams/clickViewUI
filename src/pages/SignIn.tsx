@@ -83,21 +83,52 @@ const SignIn: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors(prev => ({ ...prev, submit: '' }));
+    setIsLoading(true);
     
     try {
-      await signIn(formData.email, formData.password);
+      const response = await fetch('https://localhost:7127/api/User/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: formData.email, password: formData.password }),
+      });
+
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+        let errorMessage;
+        
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          errorMessage = error.message;
+        } else {
+          errorMessage = await response.text();
+        }
+
+        if (response.status === 403) {
+          // Store email for 2FA page
+          localStorage.setItem('userEmail', formData.email);
+          // Store password temporarily for auto sign-in after verification
+          localStorage.setItem('tempPassword', formData.password);
+          navigate('/two-factor-auth');
+          return;
+        }
+        
+        throw new Error(errorMessage || 'Failed to sign in');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('accessToken', data.accessToken);
+      localStorage.setItem('refreshToken', data.refreshToken);
+      localStorage.setItem('tokenExpiry', (Date.now() + (data.expiresIn * 1000)).toString());
       navigate('/dashboard');
     } catch (err: any) {
-      if (err.requiresVerification) {
-        // Store password temporarily for use after verification
-        localStorage.setItem('tempPassword', formData.password);
-        navigate('/two-factor-auth', { state: { userEmail: formData.email } });
-      } else {
-        setErrors(prev => ({
-          ...prev,
-          submit: err.message || 'Failed to sign in'
-        }));
-      }
+      setErrors(prev => ({
+        ...prev,
+        submit: err.message || 'Failed to sign in'
+      }));
+    } finally {
+      setIsLoading(false);
     }
   };
 
