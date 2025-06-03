@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   DocumentTextIcon,
   PlusIcon,
@@ -8,7 +8,20 @@ import {
   ArrowDownTrayIcon,
   DocumentDuplicateIcon,
   DocumentArrowUpIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
+import { getValidToken, getUserDetails } from '../utils/auth';
+
+interface EnhancedCv {
+  id: string;
+  title: string;
+  lastModified: string;
+  template: string;
+  isDefault: boolean;
+  suggestions?: string[];
+}
 
 interface Resume {
   id: string;
@@ -17,26 +30,74 @@ interface Resume {
   template: string;
   isDefault: boolean;
   file?: File;
+  previewUrl?: string;
 }
 
 const Resumes: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [resumes, setResumes] = useState<Resume[]>([
-    {
-      id: '1',
-      title: 'Software Engineer Resume',
-      lastModified: '2024-03-20',
-      template: 'Modern',
-      isDefault: true,
-    },
-    {
-      id: '2',
-      title: 'Frontend Developer Resume',
-      lastModified: '2024-03-15',
-      template: 'Professional',
-      isDefault: false,
-    },
-  ]);
+  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+  // Add a function to show status messages
+  const showStatus = (type: 'success' | 'error', message: string) => {
+    setStatusMessage({ type, message });
+    setTimeout(() => setStatusMessage(null), 3000); // Clear after 3 seconds
+  };
+
+  useEffect(() => {
+    const fetchResumes = async () => {
+      try {
+        const token = await getValidToken();
+        const userDetails = await getUserDetails();
+        
+        if (!userDetails.id) {
+          throw new Error('User ID not available');
+        }
+
+        console.log('Fetching CVs for user ID:', userDetails.id);
+
+        const response = await fetch(`https://localhost:7127/api/CV/${userDetails.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Failed to fetch resumes:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText,
+            userId: userDetails.id
+          });
+          throw new Error(`Failed to fetch resumes: ${response.status} ${response.statusText}`);
+        }
+
+        const data: EnhancedCv[] = await response.json();
+        setResumes(data.map((resume) => {
+          const lastModifiedDate = resume.lastModified ? new Date(resume.lastModified) : new Date();
+          return {
+            id: resume.id,
+            title: resume.title,
+            lastModified: lastModifiedDate.toISOString().split('T')[0],
+            template: resume.template || 'Modern',
+            isDefault: resume.isDefault || false,
+          };
+        }));
+      } catch (error) {
+        console.error('Error fetching resumes:', error);
+        showStatus('error', 'Failed to load resumes');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchResumes();
+  }, []);
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
@@ -45,19 +106,80 @@ const Resumes: React.FC = () => {
   const [sortBy, setSortBy] = useState('lastModifiedDesc'); // 'lastModifiedDesc', 'lastModifiedAsc', 'titleAsc'
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [resumeToPreview, setResumeToPreview] = useState<Resume | null>(null);
+  const [isEnhanceModalOpen, setIsEnhanceModalOpen] = useState(false);
+  const [jobTitle, setJobTitle] = useState('');
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [enhancementResult, setEnhancementResult] = useState<{ suggestions: string[], enhancedCvText: string } | null>(null);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const newResume: Resume = {
-        id: Date.now().toString(),
-        title: file.name.replace(/\.[^/.]+$/, ""), // Remove file extension
-        lastModified: new Date().toISOString().split('T')[0],
-        template: 'Modern',
-        isDefault: false,
-        file: file
-      };
-      setResumes([...resumes, newResume]);
+    if (!file) return;
+
+    setIsUploading(true);
+    setStatusMessage(null);
+
+    try {
+      const token = await getValidToken();
+      const userDetails = await getUserDetails();
+      
+      if (!userDetails.id) {
+        throw new Error('User ID not available');
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`https://localhost:7127/api/CV/${userDetails.id}/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to upload resume:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to upload resume: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Upload successful:', result);
+
+      // Refresh the resumes list
+      const resumesResponse = await fetch(`https://localhost:7127/api/CV/${userDetails.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!resumesResponse.ok) {
+        throw new Error('Failed to refresh resumes list');
+      }
+
+      const data: EnhancedCv[] = await resumesResponse.json();
+      setResumes(data.map((resume) => {
+        const lastModifiedDate = resume.lastModified ? new Date(resume.lastModified) : new Date();
+        return {
+          id: resume.id,
+          title: resume.title,
+          lastModified: lastModifiedDate.toISOString().split('T')[0],
+          template: resume.template || 'Modern',
+          isDefault: resume.isDefault || false,
+        };
+      }));
+
+      showStatus('success', 'Resume uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading resume:', error);
+      showStatus('error', 'Failed to upload resume');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -66,11 +188,41 @@ const Resumes: React.FC = () => {
     setIsDeleteModalOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedResume) {
-      setResumes(resumes.filter(r => r.id !== selectedResume.id));
-      setIsDeleteModalOpen(false);
-      setSelectedResume(null);
+      setIsDeleting(true);
+      setStatusMessage(null);
+
+      try {
+        const token = await getValidToken();
+        const response = await fetch(`https://localhost:7127/api/CV/${selectedResume.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Failed to delete resume:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText
+          });
+          throw new Error(`Failed to delete resume: ${response.status} ${response.statusText}`);
+        }
+
+        setResumes(resumes.filter(r => r.id !== selectedResume.id));
+        setIsDeleteModalOpen(false);
+        setSelectedResume(null);
+        showStatus('success', 'Resume deleted successfully');
+      } catch (error) {
+        console.error('Error deleting resume:', error);
+        showStatus('error', 'Failed to delete resume');
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
 
@@ -79,45 +231,352 @@ const Resumes: React.FC = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleDuplicate = (resume: Resume) => {
-    const newResume = {
-      ...resume,
-      id: Date.now().toString(),
-      title: `${resume.title} (Copy)`,
-      lastModified: new Date().toISOString().split('T')[0],
-      isDefault: false,
-    };
-    setResumes([...resumes, newResume]);
-  };
+  const handleSaveEdit = async () => {
+    if (!selectedResume) return;
 
-  const handleSetDefault = (resume: Resume) => {
-    setResumes(resumes.map(r => ({
-      ...r,
-      isDefault: r.id === resume.id,
-    })));
-  };
+    try {
+      const token = await getValidToken();
+      
+      // Convert string ID to number for the API
+      const resumeId = parseInt(selectedResume.id);
+      if (isNaN(resumeId)) {
+        throw new Error('Invalid resume ID');
+      }
 
-  const handleDownload = (resume: Resume) => {
-    if (resume.file) {
-      const url = URL.createObjectURL(resume.file);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', resume.file.name);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url); // Clean up the URL object
+      const response = await fetch(`https://localhost:7127/api/CV/${resumeId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: selectedResume.title,
+          template: selectedResume.template
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to update resume:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to update resume: ${response.status} ${response.statusText}`);
+      }
+
+      const updatedResume = await response.json();
+      
+      // Update the resumes list with the updated resume
+      setResumes(prevResumes => prevResumes.map(r => 
+        r.id === selectedResume.id ? {
+          ...r,
+          title: updatedResume.title,
+          template: updatedResume.template,
+          lastModified: updatedResume.lastModified
+        } : r
+      ));
+
+      setIsEditModalOpen(false);
+      showStatus('success', 'Resume updated successfully');
+    } catch (error) {
+      console.error('Error updating resume:', error);
+      showStatus('error', 'Failed to update resume');
     }
   };
 
-  const handlePreview = (resume: Resume) => {
-    setResumeToPreview(resume);
-    setIsPreviewModalOpen(true);
+  const handleDuplicate = async (resume: Resume) => {
+    try {
+      const token = await getValidToken();
+      const userDetails = await getUserDetails();
+      
+      if (!userDetails.id) {
+        throw new Error('User ID not available');
+      }
+
+      // Convert string ID to number for the API
+      const resumeId = parseInt(resume.id);
+      if (isNaN(resumeId)) {
+        throw new Error('Invalid resume ID');
+      }
+
+      const response = await fetch(`https://localhost:7127/api/CV/${resumeId}/duplicate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to duplicate resume:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to duplicate resume: ${response.status} ${response.statusText}`);
+      }
+
+      const duplicatedResume = await response.json();
+      
+      // Add the duplicated resume to the list
+      setResumes(prevResumes => [...prevResumes, {
+        id: duplicatedResume.id,
+        title: duplicatedResume.title,
+        lastModified: new Date(duplicatedResume.lastModified).toISOString().split('T')[0],
+        template: duplicatedResume.template || 'Modern',
+        isDefault: duplicatedResume.isDefault || false,
+      }]);
+
+      showStatus('success', 'Resume duplicated successfully');
+    } catch (error) {
+      console.error('Error duplicating resume:', error);
+      showStatus('error', 'Failed to duplicate resume');
+    }
+  };
+
+  const handleSetDefault = async (resume: Resume) => {
+    try {
+      const token = await getValidToken();
+      
+      // Convert string ID to number for the API
+      const resumeId = parseInt(resume.id);
+      if (isNaN(resumeId)) {
+        throw new Error('Invalid resume ID');
+      }
+
+      const response = await fetch(`https://localhost:7127/api/CV/${resumeId}/set-default`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to set default resume:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to set default resume: ${response.status} ${response.statusText}`);
+      }
+
+      // Update the resumes list to reflect the new default
+      setResumes(prevResumes => prevResumes.map(r => ({
+        ...r,
+        isDefault: r.id === resume.id
+      })));
+
+      showStatus('success', 'Default resume updated successfully');
+    } catch (error) {
+      console.error('Error setting default resume:', error);
+      showStatus('error', 'Failed to set default resume');
+    }
+  };
+
+  const handleDownload = async (resume: Resume) => {
+    try {
+      const token = await getValidToken();
+      
+      // Convert string ID to number for the API
+      const resumeId = parseInt(resume.id);
+      if (isNaN(resumeId)) {
+        throw new Error('Invalid resume ID');
+      }
+
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = `https://localhost:7127/api/CV/${resumeId}/download`;
+      link.setAttribute('download', ''); // Let the server set the filename
+      
+      // Add authorization header
+      const response = await fetch(link.href, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to download resume');
+      }
+
+      // Get the blob from the response
+      const blob = await response.blob();
+      
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      link.href = url;
+      
+      // Trigger the download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      showStatus('success', 'Resume downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading resume:', error);
+      showStatus('error', 'Failed to download resume');
+    }
+  };
+
+  const handlePreview = async (resume: Resume) => {
+    try {
+      const token = await getValidToken();
+      
+      // Convert string ID to number for the API
+      const resumeId = parseInt(resume.id);
+      if (isNaN(resumeId)) {
+        throw new Error('Invalid resume ID');
+      }
+
+      // Get the preview URL
+      const previewUrl = `https://localhost:7127/api/CV/${resumeId}/preview`;
+      
+      // Set the resume to preview with the URL
+      setResumeToPreview({
+        ...resume,
+        previewUrl: previewUrl
+      });
+      setIsPreviewModalOpen(true);
+    } catch (error) {
+      console.error('Error preparing resume preview:', error);
+      showStatus('error', 'Failed to load resume preview');
+    }
+  };
+
+  const handleEnhance = (resume: Resume) => {
+    setSelectedResume(resume);
+    setIsEnhanceModalOpen(true);
+    setJobTitle('');
+    setEnhancementResult(null);
+  };
+
+  const handleSaveEnhance = async () => {
+    if (!selectedResume || !jobTitle) return;
+
+    setIsEnhancing(true);
+    setStatusMessage(null);
+
+    try {
+      const token = await getValidToken();
+      
+      // Convert string ID to number for the API
+      const resumeId = parseInt(selectedResume.id);
+      if (isNaN(resumeId)) {
+        throw new Error('Invalid resume ID');
+      }
+
+      const response = await fetch(`https://localhost:7127/api/CV/${resumeId}/enhance`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jobTitle: jobTitle
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to enhance resume:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to enhance resume: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      setEnhancementResult({
+        suggestions: result.suggestions,
+        enhancedCvText: result.enhancedCvText
+      });
+
+      showStatus('success', 'Resume enhanced successfully');
+    } catch (error) {
+      console.error('Error enhancing resume:', error);
+      showStatus('error', 'Failed to enhance resume');
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
+  const handleDownloadEnhanced = async () => {
+    if (!selectedResume) return;
+
+    try {
+      const token = await getValidToken();
+      
+      // Convert string ID to number for the API
+      const resumeId = parseInt(selectedResume.id);
+      if (isNaN(resumeId)) {
+        throw new Error('Invalid resume ID');
+      }
+
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = `https://localhost:7127/api/CV/${resumeId}/enhancement/pdf`;
+      link.setAttribute('download', ''); // Let the server set the filename
+      
+      // Add authorization header
+      const response = await fetch(link.href, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to download enhanced resume');
+      }
+
+      // Get the blob from the response
+      const blob = await response.blob();
+      
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      link.href = url;
+      
+      // Trigger the download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      showStatus('success', 'Enhanced resume downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading enhanced resume:', error);
+      showStatus('error', 'Failed to download enhanced resume');
+    }
   };
 
   return (
     <div className="flex-1 p-6 px-6 bg-gray-100 dark:bg-gray-900">
       <div className="w-full mx-auto flex flex-col gap-6">
+        {/* Status Message */}
+        {statusMessage && (
+          <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 flex items-center space-x-3 ${
+            statusMessage.type === 'success' 
+              ? 'bg-green-50 border border-green-200 text-green-800 dark:bg-green-900/50 dark:border-green-800 dark:text-green-200' 
+              : 'bg-red-50 border border-red-200 text-red-800 dark:bg-red-900/50 dark:border-red-800 dark:text-red-200'
+          }`}>
+            {statusMessage.type === 'success' ? (
+              <CheckCircleIcon className="h-5 w-5 text-green-500" />
+            ) : (
+              <XCircleIcon className="h-5 w-5 text-red-500" />
+            )}
+            <span className="text-sm font-medium">{statusMessage.message}</span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
           <div className="flex justify-between items-center">
@@ -168,13 +627,17 @@ const Resumes: React.FC = () => {
                 onChange={handleFileUpload}
                 accept=".pdf,.doc,.docx"
                 className="hidden"
+                disabled={isUploading}
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 dark:bg-purple-700 dark:hover:bg-purple-600"
+                disabled={isUploading}
+                className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                  isUploading ? 'bg-purple-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'
+                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 dark:bg-purple-700 dark:hover:bg-purple-600`}
               >
                 <DocumentArrowUpIcon className="h-5 w-5 mr-2" />
-                Upload Resume
+                {isUploading ? 'Uploading...' : 'Upload Resume'}
               </button>
             </div>
           </div>
@@ -242,15 +705,13 @@ const Resumes: React.FC = () => {
                     <PencilIcon className="h-4 w-4 mr-1" />
                     Edit
                   </button>
-                  {resume.file && (
-                    <button
-                      onClick={() => handleDownload(resume)}
-                      className="inline-flex items-center px-3 py-1.5 border border-gray-200 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                    >
-                      <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
-                      Download
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleDownload(resume)}
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-200 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                  >
+                    <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
+                    Download
+                  </button>
                   <button
                     onClick={() => handleDuplicate(resume)}
                     className="inline-flex items-center px-3 py-1.5 border border-gray-200 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
@@ -277,6 +738,13 @@ const Resumes: React.FC = () => {
                     <TrashIcon className="h-4 w-4 mr-1" />
                     Delete
                   </button>
+                  <button
+                    onClick={() => handleEnhance(resume)}
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-200 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                  >
+                    <SparklesIcon className="h-4 w-4 mr-1" />
+                    Enhance
+                  </button>
                 </div>
               </div>
             </div>
@@ -297,9 +765,9 @@ const Resumes: React.FC = () => {
                 </button>
               </div>
               <div className="flex-grow overflow-auto border border-gray-200 dark:border-gray-700 rounded-md p-4">
-                {resumeToPreview.file ? (
+                {resumeToPreview.previewUrl ? (
                   <iframe
-                    src={URL.createObjectURL(resumeToPreview.file)}
+                    src={resumeToPreview.previewUrl}
                     title="Resume Preview"
                     width="100%"
                     height="100%"
@@ -328,15 +796,19 @@ const Resumes: React.FC = () => {
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setIsDeleteModalOpen(false)}
+                  disabled={isDeleting}
                   className="px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDelete}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  disabled={isDeleting}
+                  className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                    isDeleting ? 'bg-red-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'
+                  } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500`}
                 >
-                  Delete
+                  {isDeleting ? 'Deleting...' : 'Delete'}
                 </button>
               </div>
             </div>
@@ -388,16 +860,96 @@ const Resumes: React.FC = () => {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    setResumes(resumes.map(r => 
-                      r.id === selectedResume.id ? selectedResume : r
-                    ));
-                    setIsEditModalOpen(false);
-                  }}
+                  onClick={handleSaveEdit}
                   className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                 >
                   Save Changes
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Enhance Modal */}
+        {isEnhanceModalOpen && selectedResume && (
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full h-5/6 flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Enhance Resume: {selectedResume.title}</h3>
+                <button
+                  onClick={() => setIsEnhanceModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400"
+                >
+                  <PlusIcon className="h-6 w-6 rotate-45" />
+                </button>
+              </div>
+              <div className="flex-grow overflow-auto space-y-4">
+                {!enhancementResult ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="job-title" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Target Job Title
+                      </label>
+                      <input
+                        type="text"
+                        id="job-title"
+                        value={jobTitle}
+                        onChange={(e) => setJobTitle(e.target.value)}
+                        placeholder="e.g., Software Engineer, Product Manager"
+                        className="mt-1 block w-full border border-gray-200 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
+                      />
+                    </div>
+                    <div className="flex justify-end space-x-3">
+                      <button
+                        onClick={() => setIsEnhanceModalOpen(false)}
+                        className="px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveEnhance}
+                        disabled={isEnhancing || !jobTitle}
+                        className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                          isEnhancing || !jobTitle ? 'bg-purple-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'
+                        } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500`}
+                      >
+                        {isEnhancing ? 'Enhancing...' : 'Enhance Resume'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="text-md font-medium text-gray-900 dark:text-white mb-2">Suggestions</h4>
+                      <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
+                        <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{enhancementResult.suggestions}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-md font-medium text-gray-900 dark:text-white mb-2">Enhanced CV</h4>
+                      <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
+                        <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{enhancementResult.enhancedCvText}</p>
+                      </div>
+                    </div>
+                    <div className="flex justify-end space-x-3">
+                      <button
+                        onClick={() => {
+                          setEnhancementResult(null);
+                          setJobTitle('');
+                        }}
+                        className="px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+                      >
+                        Enhance Another
+                      </button>
+                      <button
+                        onClick={handleDownloadEnhanced}
+                        className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                      >
+                        Download Enhanced CV
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

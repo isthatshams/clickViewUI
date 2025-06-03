@@ -12,12 +12,13 @@ import {
   ChevronDoubleRightIcon,
 } from '@heroicons/react/24/solid';
 import { useSidebar } from '../context/SidebarContext';
-import { getUserDetails } from '../utils/auth';
+import { getUserDetails, logout } from '../utils/auth';
 
 interface UserDetails {
   firstName: string;
   lastName: string;
   professionalTitle: string;
+  profilePicture: string | null;
 }
 
 const Sidebar: React.FC = () => {
@@ -97,10 +98,18 @@ const Sidebar: React.FC = () => {
             </div>
           ) : userDetails ? (
             <>
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base mr-3">
-                {userDetails.firstName.charAt(0)}
-                {userDetails.lastName.charAt(0)}
-              </div>
+              {userDetails.profilePicture ? (
+                <img 
+                  src={`https://localhost:7127/${userDetails.profilePicture}`}
+                  alt={`${userDetails.firstName} ${userDetails.lastName}`}
+                  className="w-10 h-10 rounded-full object-cover mr-3"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base mr-3">
+                  {userDetails.firstName.charAt(0)}
+                  {userDetails.lastName.charAt(0)}
+                </div>
+              )}
               <div>
                 <h2 className="text-lg font-semibold text-gray-800">
                   {userDetails.firstName} {userDetails.lastName}
@@ -164,13 +173,13 @@ const Sidebar: React.FC = () => {
 
       {/* Log Out */}
       <div className="border-t border-gray-200 p-3 dark:border-gray-700">
-         <Link
-          to="/logout"
-          className={`flex items-center px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors group ${!isSidebarOpen ? 'justify-center lg:px-0' : ''} dark:hover:bg-gray-700`}
+         <button
+          onClick={() => logout()}
+          className={`flex items-center px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors group w-full ${!isSidebarOpen ? 'justify-center lg:px-0' : ''} dark:hover:bg-gray-700`}
         >
           <ArrowLeftOnRectangleIcon className={`group-hover:text-gray-500 ${isSidebarOpen ? 'h-6 w-6 mr-3' : 'h-8 w-8 lg:h-10 lg:w-10'} text-gray-400 dark:text-gray-500 dark:group-hover:text-gray-400`} />
           {isSidebarOpen && <span className="text-base font-medium text-gray-600 dark:text-gray-400">Log Out</span>}
-        </Link>
+        </button>
       </div>
     </div>
   );

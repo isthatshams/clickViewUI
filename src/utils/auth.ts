@@ -4,11 +4,12 @@ interface TokenResponse {
   expiresIn: number;
 }
 
-interface UserDetails {
+export interface UserDetails {
+  id: string;
   firstName: string;
   lastName: string;
-  professionalTitle: string;
   email: string;
+  professionalTitle: string;
   profilePicture: string | null;
 }
 
@@ -184,12 +185,17 @@ export const getUserDetails = async (): Promise<UserDetails> => {
     const data = await response.json();
     console.log('Received user data:', data);
 
-    // Return the relative path, let the component handle the full URL
+    // Ensure we have an ID from the backend
+    if (!data.id) {
+      throw new Error('User ID not found in profile response');
+    }
+
     return {
+      id: data.id,
       firstName: data.firstName || '',
       lastName: data.lastName || '',
-      professionalTitle: data.professionalTitle || 'User',
       email: data.email || '',
+      professionalTitle: data.professionalTitle || 'User',
       profilePicture: data.profilePicture
     };
   } catch (error) {
@@ -339,4 +345,32 @@ export const getPrivacySettings = async (): Promise<{ showProfile: boolean; show
   }
 
   return response.json();
+};
+
+export const logout = async () => {
+  try {
+    const token = await getValidToken();
+    if (token) {
+      // Call backend logout endpoint
+      await fetch('https://localhost:7127/api/User/logout', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    }
+  } catch (error) {
+    console.error('Logout error:', error);
+  } finally {
+    // Clear all tokens and user data regardless of backend response
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('tokenExpiry');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('tempPassword');
+    
+    // Redirect to sign in page
+    window.location.href = '/signin';
+  }
 }; 
