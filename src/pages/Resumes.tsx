@@ -166,6 +166,24 @@ const Resumes: React.FC = () => {
       }
 
       const data: EnhancedCv[] = await resumesResponse.json();
+      
+      // If this is the first resume, ensure it's set as default
+      if (data.length === 1) {
+        const setDefaultResponse = await fetch(`https://localhost:7127/api/CV/${data[0].id}/set-default`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!setDefaultResponse.ok) {
+          console.error('Failed to set first resume as default');
+        } else {
+          data[0].isDefault = true;
+        }
+      }
+
       setResumes(data.map((resume) => {
         const lastModifiedDate = resume.lastModified ? new Date(resume.lastModified) : new Date();
         return {
@@ -183,6 +201,10 @@ const Resumes: React.FC = () => {
       showStatus('error', 'Failed to upload resume');
     } finally {
       setIsUploading(false);
+      // Clear the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -217,7 +239,39 @@ const Resumes: React.FC = () => {
         }
 
         // Remove the deleted resume from the list
-        setResumes(prevResumes => prevResumes.filter(r => r.id !== selectedResume.id));
+        const updatedResumes = resumes.filter(r => r.id !== selectedResume.id);
+        
+        // If the deleted resume was the default and there are other resumes,
+        // set the most recently modified resume as default
+        if (selectedResume.isDefault && updatedResumes.length > 0) {
+          // Sort resumes by lastModified date in descending order
+          const sortedResumes = [...updatedResumes].sort((a, b) => 
+            new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
+          );
+          
+          // Get the most recent resume
+          const mostRecentResume = sortedResumes[0];
+          
+          // Set it as default
+          const setDefaultResponse = await fetch(`https://localhost:7127/api/CV/${mostRecentResume.id}/set-default`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (!setDefaultResponse.ok) {
+            console.error('Failed to set new default resume');
+          } else {
+            // Update the resumes list with the new default
+            updatedResumes.forEach(r => {
+              r.isDefault = r.id === mostRecentResume.id;
+            });
+          }
+        }
+
+        setResumes(updatedResumes);
         showStatus('success', 'Resume deleted successfully');
       } catch (error) {
         console.error('Error deleting resume:', error);
