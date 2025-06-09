@@ -10,6 +10,7 @@ import {
   DocumentArrowUpIcon,
   CheckCircleIcon,
   XCircleIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { getValidToken, getUserDetails } from '../utils/auth';
 
@@ -105,6 +106,13 @@ const Resumes: React.FC = () => {
   const [sortBy, setSortBy] = useState('lastModifiedDesc'); // 'lastModifiedDesc', 'lastModifiedAsc', 'titleAsc'
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [resumeToPreview, setResumeToPreview] = useState<Resume | null>(null);
+  const [isEnhanceModalOpen, setIsEnhanceModalOpen] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [jobTitle, setJobTitle] = useState('');
+  const [enhancement, setEnhancement] = useState<{
+    suggestions: string;
+    enhancedCvText: string;
+  } | null>(null);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -434,6 +442,83 @@ const Resumes: React.FC = () => {
     }
   };
 
+  const handleEnhance = (resume: Resume) => {
+    setSelectedResume(resume);
+    setJobTitle('');
+    setEnhancement(null);
+    setIsEnhanceModalOpen(true);
+  };
+
+  const handleEnhanceSubmit = async () => {
+    if (!selectedResume || !jobTitle.trim()) return;
+
+    setIsEnhancing(true);
+    setStatusMessage(null);
+
+    try {
+      const token = await getValidToken();
+      const response = await fetch(`https://localhost:7127/api/CV/${selectedResume.id}/enhance`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ jobTitle: jobTitle.trim() })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to enhance resume:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to enhance resume: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      setEnhancement(result);
+      showStatus('success', 'Resume enhanced successfully');
+    } catch (error) {
+      console.error('Error enhancing resume:', error);
+      showStatus('error', 'Failed to enhance resume');
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
+  const handleDownloadEnhanced = async () => {
+    if (!selectedResume) return;
+
+    try {
+      const token = await getValidToken();
+      const response = await fetch(`https://localhost:7127/api/CV/${selectedResume.id}/enhancement/pdf`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to download enhanced resume');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `enhanced_${selectedResume.title}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      showStatus('success', 'Enhanced resume downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading enhanced resume:', error);
+      showStatus('error', 'Failed to download enhanced resume');
+    }
+  };
+
   return (
     <div className="flex-1 p-6 px-6 bg-gray-100 dark:bg-gray-900">
       <div className="w-full mx-auto flex flex-col gap-6">
@@ -614,6 +699,13 @@ const Resumes: React.FC = () => {
                     <TrashIcon className="h-4 w-4 mr-1" />
                     Delete
                   </button>
+                  <button
+                    onClick={() => handleEnhance(resume)}
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-200 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                  >
+                    <SparklesIcon className="h-4 w-4 mr-1" />
+                    Enhance
+                  </button>
                 </div>
               </div>
             </div>
@@ -735,6 +827,98 @@ const Resumes: React.FC = () => {
                   Save Changes
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Enhance Modal */}
+        {isEnhanceModalOpen && selectedResume && (
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full h-5/6 flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Enhance Resume: {selectedResume.title}
+                </h3>
+                <button
+                  onClick={() => setIsEnhanceModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400"
+                >
+                  <PlusIcon className="h-6 w-6 rotate-45" />
+                </button>
+              </div>
+
+              {!enhancement ? (
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="jobTitle" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Target Job Title
+                    </label>
+                    <input
+                      type="text"
+                      id="jobTitle"
+                      value={jobTitle}
+                      onChange={(e) => setJobTitle(e.target.value)}
+                      placeholder="e.g., Senior Software Engineer"
+                      className="mt-1 block w-full border border-gray-200 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-3">
+                    <button
+                      onClick={() => setIsEnhanceModalOpen(false)}
+                      className="px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleEnhanceSubmit}
+                      disabled={isEnhancing || !jobTitle.trim()}
+                      className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                        isEnhancing || !jobTitle.trim()
+                          ? 'bg-purple-400 cursor-not-allowed'
+                          : 'bg-purple-600 hover:bg-purple-700'
+                      } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500`}
+                    >
+                      {isEnhancing ? 'Enhancing...' : 'Enhance Resume'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-grow overflow-auto space-y-6">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Suggestions</h4>
+                    <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
+                      <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
+                        {enhancement.suggestions}
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Enhanced Resume</h4>
+                    <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
+                      <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
+                        {enhancement.enhancedCvText}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-3">
+                    <button
+                      onClick={() => {
+                        setEnhancement(null);
+                        setJobTitle('');
+                      }}
+                      className="px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+                    >
+                      Enhance Another
+                    </button>
+                    <button
+                      onClick={handleDownloadEnhanced}
+                      className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                    >
+                      Download PDF
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

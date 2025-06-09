@@ -83,11 +83,19 @@ export const startTokenRefreshCheck = () => {
   const checkInterval = 60000; // Check every minute
   
   setInterval(async () => {
-    if (isTokenExpired()) {
-      const refreshSuccess = await refreshAccessToken();
-      if (!refreshSuccess) {
-        // Redirect to login if refresh fails
-        window.location.href = '/signin';
+    // Get current path
+    const currentPath = window.location.pathname;
+    // List of public routes that don't require authentication
+    const publicRoutes = ['/', '/about', '/signin', '/signup', '/forgot-password', '/reset-password', '/check-email'];
+    
+    // Only check token and redirect if we're on a protected route
+    if (!publicRoutes.includes(currentPath)) {
+      if (isTokenExpired()) {
+        const refreshSuccess = await refreshAccessToken();
+        if (!refreshSuccess) {
+          // Redirect to login if refresh fails
+          window.location.href = '/signin';
+        }
       }
     }
   }, checkInterval);

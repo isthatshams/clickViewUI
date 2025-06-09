@@ -15,6 +15,8 @@ import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import Resumes from './pages/Resumes';
 import Interviews from './pages/Interviews';
+import AboutUs from './pages/AboutUs';
+import Features from './pages/Features';
 
 const App: React.FC = () => {
   return (
@@ -22,6 +24,8 @@ const App: React.FC = () => {
       <SidebarProvider>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/about" element={<AboutUs />} />
+          <Route path="/features" element={<Features />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/two-factor-auth" element={<TwoFactorAuth />} />
