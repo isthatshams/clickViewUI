@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CalendarIcon, ClockIcon, PlayIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { getValidToken, getUserDetails } from '../utils/auth';
+import { useNavigate } from 'react-router-dom';
 
 interface MockInterview {
   id: string;
@@ -39,6 +40,7 @@ interface CV {
 }
 
 const Interviews: React.FC = () => {
+  const navigate = useNavigate();
   const [mockInterviews, setMockInterviews] = useState<MockInterview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,26 +78,36 @@ const Interviews: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch interviews');
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `Failed to fetch interviews: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      setMockInterviews(data.map((interview: any) => ({
-        id: interview.interviewId,
-        title: `${interview.interviewType} Interview`,
-        date: interview.startedAt,
-        time: interview.startedAt,
-        status: interview.answerCount === 0 ? 'scheduled' : 
-                interview.answerCount === interview.questionCount ? 'completed' : 'in_progress',
-        type: interview.interviewType.toLowerCase(),
-        duration: 45, // Default duration
-        questionCount: interview.questionCount,
-        answerCount: interview.answerCount,
-        mark: interview.interviewMark
-      })));
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid response format from server');
+      }
+
+      setMockInterviews(data.map((interview: any) => {
+        // Ensure interviewType is a string and has a default value
+        const interviewType = (interview.interviewType || 'Chat').toString();
+        
+        return {
+          id: interview.interviewId,
+          title: `${interviewType} Interview`,
+          date: interview.startedAt,
+          time: interview.startedAt,
+          status: interview.answerCount === 0 ? 'scheduled' : 
+                  interview.answerCount === interview.questionCount ? 'completed' : 'in_progress',
+          type: interviewType.toLowerCase() as 'technical' | 'behavioral' | 'system_design',
+          duration: 45, // Default duration
+          questionCount: interview.questionCount || 0,
+          answerCount: interview.answerCount || 0,
+          mark: interview.interviewMark || 0
+        };
+      }));
     } catch (error) {
       console.error('Error fetching interviews:', error);
-      setError('Failed to load interviews');
+      setError(error instanceof Error ? error.message : 'Failed to load interviews');
     } finally {
       setIsLoading(false);
     }
@@ -145,6 +157,7 @@ const Interviews: React.FC = () => {
     }
 
     setIsScheduling(true);
+    setError(null); // Clear any previous errors
     try {
       const token = await getValidToken();
       const userDetails = await getUserDetails();
@@ -153,7 +166,7 @@ const Interviews: React.FC = () => {
         throw new Error('User ID not available');
       }
 
-      const response = await fetch(`https://localhost:7127/api/Interview/start`, {
+      const response = await fetch('https://localhost:7127/api/Interview/start', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -169,17 +182,22 @@ const Interviews: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to start interview');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to start interview');
       }
 
       const result = await response.json();
       setIsConfigModalOpen(false);
       
-      // Redirect to interview room
-      window.location.href = `/interview-room/${result.interviewId}`;
+      // Navigate based on interview type
+      if (interviewType === 'Chat') {
+        navigate(`/interview/text/${result.interviewId}`);
+      } else {
+        navigate(`/interview/voice/${result.interviewId}`);
+      }
     } catch (error) {
       console.error('Error starting interview:', error);
-      setError('Failed to start interview');
+      setError(error instanceof Error ? error.message : 'Failed to start interview');
     } finally {
       setIsScheduling(false);
     }
@@ -286,10 +304,21 @@ const Interviews: React.FC = () => {
                     </button>
                     {interview.status === 'scheduled' && (
                       <button
-                        onClick={() => handleStartInterview()}
-                        className="p-2 text-gray-600 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400"
+                        onClick={handleStartInterview}
+                        disabled={isScheduling}
+                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <PlayIcon className="h-5 w-5" />
+                        {isScheduling ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Starting Interview...
+                          </>
+                        ) : (
+                          'Start Interview'
+                        )}
                       </button>
                     )}
                   </div>
@@ -410,12 +439,28 @@ const Interviews: React.FC = () => {
                 </button>
                 <button
                   onClick={handleStartInterview}
-                  disabled={isScheduling || !jobTitle.trim()}
+                  disabled={isScheduling}
                   className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {isScheduling ? 'Starting...' : 'Start Interview'}
+                  {isScheduling ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Starting Interview...
+                    </>
+                  ) : (
+                    'Start Interview'
+                  )}
                 </button>
               </div>
+
+              {error && (
+                <div className="mt-2 text-sm text-red-600">
+                  {error}
+                </div>
+              )}
             </div>
           </div>
         )}

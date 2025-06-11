@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 import logoImage from '../assets/Logo Written.png'; // Assuming the logo is here
 import visualLogoImage from '../assets/Logo Visualed.png'; // Import the new logo
 import googleIcon from '../assets/google.svg'; // Import the Google SVG
@@ -148,6 +149,47 @@ const SignUp: React.FC = () => {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    try {
+      const response = await fetch('https://localhost:7127/api/user/google-auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          credential: credentialResponse.credential
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Google authentication failed');
+      }
+
+      // Store the tokens
+      localStorage.setItem('accessToken', data.token);
+      localStorage.setItem('refreshToken', data.refreshToken);
+      localStorage.setItem('tokenExpiry', (Date.now() + (data.expiresIn * 1000)).toString());
+      
+      // Redirect to dashboard
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Google authentication error:', error);
+      setErrors(prev => ({
+        ...prev,
+        submit: error instanceof Error ? error.message : 'Google authentication failed. Please try again.'
+      }));
+    }
+  };
+
+  const handleGoogleError = () => {
+    setErrors(prev => ({
+      ...prev,
+      submit: 'Google authentication failed. Please try again.'
+    }));
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative">
       {/* Top-left logo */}
@@ -283,24 +325,28 @@ const SignUp: React.FC = () => {
         </div>
 
         <div>
-          <button
-            type="button"
-            className="w-full flex items-center justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200"
-          >
-             <span className="mr-2 flex items-center">
-               <img src={googleIcon} alt="Google Icon" className="h-4 w-4" />
-             </span>
-            Continue with Google
-          </button>
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={handleGoogleError}
+            useOneTap
+            theme="outline"
+            text="continue_with"
+            shape="rectangular"
+            width="100%"
+            type="standard"
+            logo_alignment="left"
+            locale="en"
+          />
         </div>
 
-        <div className="mt-4 text-center text-sm text-gray-600">
-          Already have an account? {' '}
-          <Link to="/signin" className="font-medium text-purple-600 hover:text-purple-500">
-            Sign In
-          </Link>
+        <div className="text-center mt-4">
+          <p className="text-sm text-gray-600">
+            Already have an account?{' '}
+            <Link to="/signin" className="font-medium text-purple-600 hover:text-purple-500">
+              Sign in
+            </Link>
+          </p>
         </div>
-
       </div>
     </div>
   );

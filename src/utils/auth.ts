@@ -90,11 +90,11 @@ export const startTokenRefreshCheck = () => {
     
     // Only check token and redirect if we're on a protected route
     if (!publicRoutes.includes(currentPath)) {
-      if (isTokenExpired()) {
-        const refreshSuccess = await refreshAccessToken();
-        if (!refreshSuccess) {
-          // Redirect to login if refresh fails
-          window.location.href = '/signin';
+    if (isTokenExpired()) {
+      const refreshSuccess = await refreshAccessToken();
+      if (!refreshSuccess) {
+        // Redirect to login if refresh fails
+        window.location.href = '/signin';
         }
       }
     }

@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import mohammadImage from '../assets/members/Mohammad Shams.jpg';
 import helmiImage from '../assets/members/Helmi Nofal.jpg';
 import nadaImage from '../assets/members/Nada.jpg';
+import omarImage from '../assets/members/Omar.jpg';
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -47,7 +48,7 @@ const AboutUs: React.FC = () => {
       name: "Omar Al Qaissieh",
       role: "AI Developer, Prompt Engineer",
       description: "Focuses on AI prompt engineering and contributes to building the app's intelligent features.",
-      image: null,
+      image: omarImage,
       skills: ["AI Development", "Prompt Engineering", "Machine Learning", "Natural Language Processing"]
     }
   ];
