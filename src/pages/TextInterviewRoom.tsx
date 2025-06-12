@@ -27,6 +27,7 @@ const TextInterviewRoom: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [showExitModal, setShowExitModal] = useState(false);
 
   useEffect(() => {
     fetchInterviewQuestions();
@@ -132,7 +133,12 @@ const TextInterviewRoom: React.FC = () => {
     setIsSubmitting(true);
     try {
       const token = await getValidToken();
-      const response = await fetch(`https://localhost:7127/api/Interview/chat/answer-next`, {
+      
+      // Check if this is an edit (answer already exists in database) or new answer
+      const isEdit = currentAnswer.UserAnswerId > 0;
+      const endpoint = isEdit ? 'chat/edit-answer' : 'chat/answer-next';
+      
+      const response = await fetch(`https://localhost:7127/api/Interview/${endpoint}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -141,7 +147,9 @@ const TextInterviewRoom: React.FC = () => {
         body: JSON.stringify({
           interviewId: parseInt(interviewId!),
           questionId: currentQuestion.QuestionId,
-          userAnswerText: currentAnswer.UserAnswerText
+          userAnswerText: currentAnswer.UserAnswerText,
+          // For edit endpoint, we need the new answer text
+          ...(isEdit && { newAnswerText: currentAnswer.UserAnswerText })
         }),
       });
 
@@ -152,8 +160,8 @@ const TextInterviewRoom: React.FC = () => {
 
       const result = await response.json();
       
-      // If there's a follow-up question, add it to the questions list
-      if (result.question) {
+      // Only handle follow-up questions for new answers, not edits
+      if (!isEdit && result.question) {
         const newQuestion: Question = {
           QuestionId: result.questionId,
           QuestionText: result.question,
@@ -161,11 +169,22 @@ const TextInterviewRoom: React.FC = () => {
           QuestionMark: 5,
           ParentQuestionId: currentQuestion.QuestionId
         };
-        setQuestions(prev => [...prev, newQuestion]);
+        
+        // Insert the follow-up question right after the current question
+        setQuestions(prev => {
+          const newQuestions = [...prev];
+          newQuestions.splice(currentQuestionIndex + 1, 0, newQuestion);
+          return newQuestions;
+        });
+        
+        // Move to next question only for new answers with follow-ups
+        setCurrentQuestionIndex(prev => prev + 1);
+      } else if (!isEdit) {
+        // For new answers without follow-ups, move to next question
+        setCurrentQuestionIndex(prev => prev + 1);
       }
-
-      // Move to next question
-      setCurrentQuestionIndex(prev => prev + 1);
+      // For edits, stay on the same question
+      
     } catch (error) {
       console.error('Error submitting answer:', error);
       setError(error instanceof Error ? error.message : 'Failed to submit answer');
@@ -215,11 +234,22 @@ const TextInterviewRoom: React.FC = () => {
               <p className="text-sm text-gray-600">Let's explore your expertise together</p>
             </div>
           </div>
-          <div className="flex items-center space-x-3 bg-gray-100 px-4 py-2 rounded-full">
-            <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="text-lg font-semibold text-gray-700">{formatTime(timeLeft)}</span>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3 bg-gray-100 px-4 py-2 rounded-full">
+              <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-lg font-semibold text-gray-700">{formatTime(timeLeft)}</span>
+            </div>
+            <button
+              onClick={() => setShowExitModal(true)}
+              className="inline-flex items-center px-3 py-1.5 border border-gray-200 rounded-md text-sm font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200"
+            >
+              <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              <span>Exit Interview</span>
+            </button>
           </div>
         </div>
 
@@ -329,7 +359,7 @@ const TextInterviewRoom: React.FC = () => {
               </>
             ) : (
               <>
-                <span>Submit Answer</span>
+                <span>{currentAnswer && currentAnswer.UserAnswerId > 0 ? 'Update Answer' : 'Submit Answer'}</span>
                 <svg className="w-5 h-5 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
@@ -346,6 +376,37 @@ const TextInterviewRoom: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <p className="text-sm text-red-600">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Exit Confirmation Modal */}
+        {showExitModal && (
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Exit Interview
+              </h3>
+              <p className="text-sm text-gray-600 mb-6">
+                Are you sure you want to exit the interview? Your progress will be saved.
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowExitModal(false)}
+                  className="px-4 py-2 border border-gray-200 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowExitModal(false);
+                    navigate('/interviews');
+                  }}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  Exit Interview
+                </button>
+              </div>
             </div>
           </div>
         )}
