@@ -17,6 +17,7 @@ import Settings from './pages/Settings';
 import Resumes from './pages/Resumes';
 import Interviews from './pages/Interviews';
 import TextInterviewRoom from './pages/TextInterviewRoom';
+import InterviewRoom from './pages/InterviewRoom';
 import AboutUs from './pages/AboutUs';
 import Features from './pages/Features';
 
@@ -40,6 +41,8 @@ const App: React.FC = () => {
           <Route path="/resumes" element={<AuthenticatedLayout><Resumes /></AuthenticatedLayout>} />
           <Route path="/interviews" element={<AuthenticatedLayout><Interviews /></AuthenticatedLayout>} />
             <Route path="/interview/text/:interviewId" element={<TextInterviewRoom />} />
+            <Route path="/interview/voice/:interviewId" element={<InterviewRoom />} />
+            <Route path="/interview/room/:interviewId" element={<InterviewRoom />} />
         </Routes>
       </SidebarProvider>
     </Router>

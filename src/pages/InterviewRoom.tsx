@@ -27,6 +27,7 @@ const InterviewRoom: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [interviewType, setInterviewType] = useState<'Chat' | 'Voice'>('Chat');
+  const [showExitModal, setShowExitModal] = useState(false);
 
   useEffect(() => {
     fetchInterviewQuestions();
@@ -145,8 +146,8 @@ const InterviewRoom: React.FC = () => {
       if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(prev => prev + 1);
       } else {
-        // Interview completed
-        navigate('/interviews');
+        // Interview completed - call the end endpoint
+        await handleInterviewEnd('Interview completed');
       }
     } catch (error) {
       console.error('Error submitting answer:', error);
@@ -154,6 +155,33 @@ const InterviewRoom: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleInterviewEnd = async (reason: string) => {
+    console.log(`Interview ended: ${reason}`);
+    
+    try {
+      // Call the backend to mark the interview as finished
+      const token = await getValidToken();
+      const response = await fetch(`https://localhost:7127/api/Interview/${interviewId}/end`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        console.log('Interview marked as finished successfully');
+      } else {
+        console.warn('Failed to mark interview as finished:', response.status);
+      }
+    } catch (error) {
+      console.error('Error ending interview:', error);
+    }
+    
+    // Navigate to interviews page
+    navigate('/interviews');
   };
 
   const formatTime = (seconds: number) => {
@@ -195,8 +223,16 @@ const InterviewRoom: React.FC = () => {
                 Question {currentQuestionIndex + 1} of {questions.length}
               </p>
             </div>
-            <div className="text-lg font-semibold text-gray-800 dark:text-white">
-              Time Left: {formatTime(timeLeft)}
+            <div className="flex items-center space-x-4">
+              <div className="text-lg font-semibold text-gray-800 dark:text-white">
+                Time Left: {formatTime(timeLeft)}
+              </div>
+              <button
+                onClick={() => setShowExitModal(true)}
+                className="px-4 py-2 text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+              >
+                Exit Interview
+              </button>
             </div>
           </div>
         </div>
@@ -260,6 +296,37 @@ const InterviewRoom: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Exit Confirmation Modal */}
+      {showExitModal && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Exit Interview
+            </h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to exit the interview? Your progress will be saved.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowExitModal(false)}
+                className="px-4 py-2 border border-gray-200 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowExitModal(false);
+                  handleInterviewEnd('User exited');
+                }}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                Exit Interview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -27,6 +27,9 @@ const TextInterviewRoom: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [endTime, setEndTime] = useState<Date | null>(null);
+  const [isQuestionsPanelCollapsed, setIsQuestionsPanelCollapsed] = useState(false);
+  const [completedQuestions, setCompletedQuestions] = useState<Set<number>>(new Set());
   const [showExitModal, setShowExitModal] = useState(false);
 
   useEffect(() => {
@@ -34,13 +37,39 @@ const TextInterviewRoom: React.FC = () => {
   }, [interviewId]);
 
   useEffect(() => {
+    console.log(`Timer useEffect triggered - timeLeft: ${timeLeft}, questions.length: ${questions.length}`);
+    
     if (timeLeft > 0) {
       const timer = setInterval(() => {
-        setTimeLeft(prev => prev - 1);
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            // Interview ends when timer reaches 0
+            console.log('Timer reached 0, ending interview');
+            handleInterviewEnd('Time limit reached');
+            return 0;
+          }
+          return prev - 1;
+        });
       }, 1000);
       return () => clearInterval(timer);
+    } else if (timeLeft === 0 && questions.length > 0) {
+      // If timer is 0 and we have questions, check if this is a fresh interview
+      const hasAnswers = answers.length > 0;
+      if (hasAnswers) {
+        console.log('Timer is 0 and questions exist with answers, ending interview');
+        handleInterviewEnd('Time limit reached');
+      } else if (endTime) {
+        // Recalculate timer using the stored end time
+        const now = new Date();
+        const remainingTime = Math.max(0, Math.floor((endTime.getTime() - now.getTime()) / 1000));
+        console.log(`Recalculating timer from end time: ${remainingTime} seconds remaining`);
+        setTimeLeft(remainingTime);
+      } else {
+        console.log('No end time available, setting default timer');
+        setTimeLeft(45 * 60);
+      }
     }
-  }, [timeLeft]);
+  }, [timeLeft, questions.length, answers.length, endTime]);
 
   const fetchInterviewQuestions = async () => {
     try {
@@ -70,6 +99,7 @@ const TextInterviewRoom: React.FC = () => {
       // Handle both capitalized and lowercase property names
       const questions = data.Questions || data.questions;
       const answers = data.Answers || data.answers;
+      const startedAt = data.StartedAt || data.startedAt;
 
       if (!questions || !Array.isArray(questions)) {
         throw new Error('Invalid interview data format: questions array is missing or invalid');
@@ -77,7 +107,89 @@ const TextInterviewRoom: React.FC = () => {
 
       setQuestions(questions);
       setAnswers(answers || []);
-      setTimeLeft(45 * 60); // Default 45 minutes
+      
+      // Calculate timer based on StartedAt from backend
+      const interviewTimeLimit = 45 * 60; // 45 minutes in seconds
+      
+      if (startedAt) {
+        // Parse the start time from backend
+        let startTime: Date;
+        
+        // Since we're now storing local time, we can directly parse it
+        if (startedAt.includes('Z') || startedAt.includes('+') || startedAt.includes('-')) {
+          // Has timezone info - parse as is
+          startTime = new Date(startedAt);
+        } else {
+          // No timezone info - treat as local time (which it now is)
+          startTime = new Date(startedAt);
+          console.log(`Parsed local time ${startedAt} as: ${startTime.toLocaleString()}`);
+        }
+        
+        const calculatedEndTime = new Date(startTime.getTime() + (interviewTimeLimit * 1000)); // Add 45 minutes in milliseconds
+        const now = new Date();
+        
+        // Calculate remaining time by subtracting current time from end time
+        let remainingTime = Math.max(0, Math.floor((calculatedEndTime.getTime() - now.getTime()) / 1000));
+        
+        // If remaining time is 0 but this is a fresh interview, there might be a timezone issue
+        // In that case, assume the interview just started and set it to full time
+        if (remainingTime === 0 && answers.length === 0) {
+          console.log('Timer shows 0 but no answers - possible timezone issue, setting to full time');
+          remainingTime = interviewTimeLimit;
+          // Recalculate end time from now
+          const newEndTime = new Date(now.getTime() + (interviewTimeLimit * 1000));
+          setEndTime(newEndTime);
+        } else {
+          setEndTime(calculatedEndTime);
+        }
+        
+        // Additional safety check: if this is a very fresh interview (less than 1 minute old), 
+        // ensure it has at least 44 minutes remaining
+        const timeSinceStart = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+        if (timeSinceStart < 60 && remainingTime < (44 * 60)) { // Less than 1 minute old and less than 44 minutes remaining
+          console.log('Very fresh interview detected, ensuring minimum time remaining');
+          remainingTime = Math.max(remainingTime, 44 * 60);
+          const safetyEndTime = new Date(now.getTime() + (remainingTime * 1000));
+          setEndTime(safetyEndTime);
+        }
+        
+        setTimeLeft(remainingTime);
+        
+        // Detailed debugging
+        console.log('=== TIMER DEBUGGING ===');
+        console.log(`Raw StartedAt from backend: ${startedAt}`);
+        console.log(`Parsed start time: ${startTime.toISOString()}`);
+        console.log(`Calculated end time: ${calculatedEndTime.toISOString()}`);
+        console.log(`Current time: ${now.toISOString()}`);
+        console.log(`Start time timestamp: ${startTime.getTime()}`);
+        console.log(`End time timestamp: ${calculatedEndTime.getTime()}`);
+        console.log(`Current time timestamp: ${now.getTime()}`);
+        console.log(`Time difference (end - current): ${calculatedEndTime.getTime() - now.getTime()} ms`);
+        console.log(`Interview time limit: ${interviewTimeLimit} seconds`);
+        console.log(`Remaining time: ${remainingTime} seconds`);
+        console.log(`Time zone offset: ${now.getTimezoneOffset()} minutes`);
+        console.log(`Number of answers: ${answers.length}`);
+        console.log(`Time since start: ${timeSinceStart} seconds`);
+        console.log('=== END DEBUGGING ===');
+        
+        // If interview has already expired, it will be handled by the timer useEffect
+      } else {
+        // Fallback to default time if no start time available
+        const now = new Date();
+        const calculatedEndTime = new Date(now.getTime() + (interviewTimeLimit * 1000));
+        setEndTime(calculatedEndTime);
+        setTimeLeft(interviewTimeLimit);
+        console.log('No start time available, using default timer:', interviewTimeLimit, 'seconds');
+      }
+
+      // Initialize completed questions based on existing answers
+      if (answers && Array.isArray(answers)) {
+        const completedQuestionIds = new Set<number>();
+        answers.forEach((answer: Answer) => {
+          completedQuestionIds.add(answer.QuestionId);
+        });
+        setCompletedQuestions(completedQuestionIds);
+      }
     } catch (error) {
       console.error('Error fetching interview questions:', error);
       setError(error instanceof Error ? error.message : 'Failed to load interview questions');
@@ -86,8 +198,19 @@ const TextInterviewRoom: React.FC = () => {
     }
   };
 
+  // Set current question index after questions are loaded
+  useEffect(() => {
+    if (questions.length > 0) {
+      const orderedQuestions = getQuestionsInOrder();
+      const firstUnansweredIndex = orderedQuestions.findIndex(question => !completedQuestions.has(question.QuestionId));
+      if (firstUnansweredIndex !== -1) {
+        setCurrentQuestionIndex(firstUnansweredIndex);
+      }
+    }
+  }, [questions, completedQuestions]);
+
   const handleAnswerChange = (answerText: string) => {
-    const currentQuestion = questions[currentQuestionIndex];
+    const currentQuestion = getQuestionsInOrder()[currentQuestionIndex];
     const existingAnswerIndex = answers.findIndex(a => a.QuestionId === currentQuestion.QuestionId);
 
     if (existingAnswerIndex >= 0) {
@@ -108,7 +231,7 @@ const TextInterviewRoom: React.FC = () => {
   };
 
   const handleNotesChange = (notes: string) => {
-    const currentQuestion = questions[currentQuestionIndex];
+    const currentQuestion = getQuestionsInOrder()[currentQuestionIndex];
     const existingAnswerIndex = answers.findIndex(a => a.QuestionId === currentQuestion.QuestionId);
 
     if (existingAnswerIndex >= 0) {
@@ -122,7 +245,7 @@ const TextInterviewRoom: React.FC = () => {
   };
 
   const handleSubmitAnswer = async () => {
-    const currentQuestion = questions[currentQuestionIndex];
+    const currentQuestion = getQuestionsInOrder()[currentQuestionIndex];
     const currentAnswer = answers.find(a => a.QuestionId === currentQuestion.QuestionId);
 
     if (!currentAnswer) {
@@ -160,30 +283,93 @@ const TextInterviewRoom: React.FC = () => {
 
       const result = await response.json();
       
-      // Only handle follow-up questions for new answers, not edits
-      if (!isEdit && result.question) {
-        const newQuestion: Question = {
-          QuestionId: result.questionId,
-          QuestionText: result.question,
-          DifficultyLevel: currentQuestion.DifficultyLevel,
-          QuestionMark: 5,
-          ParentQuestionId: currentQuestion.QuestionId
-        };
-        
-        // Insert the follow-up question right after the current question
-        setQuestions(prev => {
-          const newQuestions = [...prev];
-          newQuestions.splice(currentQuestionIndex + 1, 0, newQuestion);
-          return newQuestions;
-        });
-        
-        // Move to next question only for new answers with follow-ups
-        setCurrentQuestionIndex(prev => prev + 1);
-      } else if (!isEdit) {
-        // For new answers without follow-ups, move to next question
-        setCurrentQuestionIndex(prev => prev + 1);
+      // Mark current question as completed only after successful submission
+      setCompletedQuestions(prev => new Set([...prev, currentQuestion.QuestionId]));
+      
+      // Update the answer with the UserAnswerId from the backend (for new answers)
+      if (!isEdit && result.userAnswerId) {
+        setAnswers(prev => prev.map(a => 
+          a.QuestionId === currentQuestion.QuestionId 
+            ? { ...a, UserAnswerId: result.userAnswerId }
+            : a
+        ));
       }
-      // For edits, stay on the same question
+      
+      if (isEdit) {
+        // Handle edit response - remove old follow-up questions and add new ones
+        if (result.question) {
+          // Get questions that should be deleted based on the edited question
+          const questionsToDelete = getQuestionsToDelete(currentQuestion.QuestionId);
+          
+          // Remove questions that should be deleted
+          setQuestions(prev => {
+            const newQuestions = prev.filter(q => !questionsToDelete.includes(q.QuestionId));
+            
+            // Add the new follow-up question
+            const newQuestion: Question = {
+              QuestionId: result.questionId,
+              QuestionText: result.question,
+              DifficultyLevel: currentQuestion.DifficultyLevel,
+              QuestionMark: 5,
+              ParentQuestionId: currentQuestion.QuestionId
+            };
+            
+            // Find the position to insert the new question
+            const currentIndex = newQuestions.findIndex(q => q.QuestionId === currentQuestion.QuestionId);
+            if (currentIndex !== -1) {
+              newQuestions.splice(currentIndex + 1, 0, newQuestion);
+            }
+            
+            return newQuestions;
+          });
+          
+          // Update answers to remove deleted questions
+          setAnswers(prev => prev.filter(a => !questionsToDelete.includes(a.QuestionId)));
+          
+          // Update completed questions to remove deleted questions
+          setCompletedQuestions(prev => {
+            const newCompleted = new Set(prev);
+            questionsToDelete.forEach(id => newCompleted.delete(id));
+            return newCompleted;
+          });
+          
+          // Move to the new follow-up question
+          setCurrentQuestionIndex(prev => prev + 1);
+        }
+        // If no follow-up question, stay on current question
+      } else {
+        // Handle new answer response
+        if (result.question) {
+          // Check if AI wants to continue or end the interview
+          if (result.should_continue === false) {
+            // Interview completed - strong answer provided
+            console.log('Interview completed:', result.reason || result.message);
+            handleInterviewEnd('Interview completed - strong answers provided');
+            return;
+          }
+          
+          const newQuestion: Question = {
+            QuestionId: result.questionId,
+            QuestionText: result.question,
+            DifficultyLevel: currentQuestion.DifficultyLevel,
+            QuestionMark: 5,
+            ParentQuestionId: currentQuestion.QuestionId
+          };
+          
+          // Insert the follow-up question right after the current question
+          setQuestions(prev => {
+            const newQuestions = [...prev];
+            newQuestions.splice(currentQuestionIndex + 1, 0, newQuestion);
+            return newQuestions;
+          });
+          
+          // Move to next question only for new answers with follow-ups
+          setCurrentQuestionIndex(prev => prev + 1);
+        } else if (!isEdit) {
+          // For new answers without follow-ups, move to next question
+          setCurrentQuestionIndex(prev => prev + 1);
+        }
+      }
       
     } catch (error) {
       console.error('Error submitting answer:', error);
@@ -198,6 +384,164 @@ const TextInterviewRoom: React.FC = () => {
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
+
+  const handleInterviewEnd = async (reason: string) => {
+    console.log(`Interview ended: ${reason}`);
+    
+    try {
+      // Call the backend to mark the interview as finished
+      const token = await getValidToken();
+      const response = await fetch(`https://localhost:7127/api/Interview/${interviewId}/end`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        console.log('Interview marked as finished successfully');
+      } else {
+        console.warn('Failed to mark interview as finished:', response.status);
+      }
+    } catch (error) {
+      console.error('Error ending interview:', error);
+    }
+    
+    // Navigate to interviews page
+    navigate('/interviews');
+  };
+
+  // Helper function to find the main question (root) of any question
+  const findMainQuestion = (questionId: number): number => {
+    const question = questions.find(q => q.QuestionId === questionId);
+    if (!question) return -1;
+    
+    // If no parent, it's a main question
+    if (!question.ParentQuestionId) return questionId;
+    
+    // Recursively find the root parent
+    return findMainQuestion(question.ParentQuestionId);
+  };
+
+  // Helper function to get all questions in a branch (main question + all its follow-ups)
+  const getBranchQuestions = (mainQuestionId: number): Question[] => {
+    const branchQuestions: Question[] = [];
+    const mainQuestion = questions.find(q => q.QuestionId === mainQuestionId);
+    if (!mainQuestion) return branchQuestions;
+    
+    branchQuestions.push(mainQuestion);
+    
+    // Find all direct and indirect children
+    const findChildren = (parentId: number) => {
+      const children = questions.filter(q => q.ParentQuestionId === parentId);
+      children.forEach(child => {
+        branchQuestions.push(child);
+        findChildren(child.QuestionId);
+      });
+    };
+    
+    findChildren(mainQuestionId);
+    return branchQuestions;
+  };
+
+  // Helper function to get all question IDs that should be deleted when editing a question
+  const getQuestionsToDelete = (editedQuestionId: number): number[] => {
+    const question = questions.find(q => q.QuestionId === editedQuestionId);
+    if (!question) return [];
+    
+    const questionsToDelete: number[] = [];
+    
+    // If editing a main question, delete all its follow-ups
+    if (!question.ParentQuestionId) {
+      const branchQuestions = getBranchQuestions(editedQuestionId);
+      questionsToDelete.push(...branchQuestions.filter(q => q.QuestionId !== editedQuestionId).map(q => q.QuestionId));
+    } else {
+      // If editing a follow-up question, delete all subsequent follow-ups in the same branch
+      const mainQuestionId = findMainQuestion(editedQuestionId);
+      const branchQuestions = getBranchQuestions(mainQuestionId);
+      
+      // Find the index of the edited question in the branch
+      const editedIndex = branchQuestions.findIndex(q => q.QuestionId === editedQuestionId);
+      if (editedIndex !== -1) {
+        // Delete all questions that come after the edited question in the branch
+        for (let i = editedIndex + 1; i < branchQuestions.length; i++) {
+          questionsToDelete.push(branchQuestions[i].QuestionId);
+        }
+      }
+    }
+    
+    return questionsToDelete;
+  };
+
+  // Helper function to get questions in proper display order (main questions first, then their follow-ups)
+  const getQuestionsInOrder = (): Question[] => {
+    const mainQuestions = questions.filter(q => !q.ParentQuestionId);
+    const orderedQuestions: Question[] = [];
+    
+    mainQuestions.forEach(mainQuestion => {
+      // Add main question
+      orderedQuestions.push(mainQuestion);
+      
+      // Add all follow-ups for this main question
+      const branchQuestions = getBranchQuestions(mainQuestion.QuestionId);
+      branchQuestions.forEach(question => {
+        if (question.QuestionId !== mainQuestion.QuestionId) {
+          orderedQuestions.push(question);
+        }
+      });
+    });
+    
+    return orderedQuestions;
+  };
+
+  // Helper function to get question label (number for main questions, alphabet for sub-questions)
+  const getQuestionLabel = (question: Question, index: number): string => {
+    const isMainQuestion = !question.ParentQuestionId;
+    
+    if (isMainQuestion) {
+      // For main questions, use the main question number
+      const mainQuestionIndex = questions.filter(q => !q.ParentQuestionId).findIndex(q => q.QuestionId === question.QuestionId);
+      return `${mainQuestionIndex + 1}`;
+    } else {
+      // For sub-questions, find the main question and count sub-questions
+      const mainQuestionId = findMainQuestion(question.QuestionId);
+      const mainQuestion = questions.find(q => q.QuestionId === mainQuestionId);
+      if (!mainQuestion) return `${index + 1}`;
+      
+      const branchQuestions = getBranchQuestions(mainQuestionId);
+      const subQuestionIndex = branchQuestions.findIndex(q => q.QuestionId === question.QuestionId) - 1; // -1 because first is main question
+      
+      // Convert to alphabet (A, B, C, etc.)
+      return String.fromCharCode(65 + subQuestionIndex); // 65 is ASCII for 'A'
+    }
+  };
+
+  // Function to recalculate timer from end time
+  const recalculateTimer = () => {
+    if (endTime) {
+      const now = new Date();
+      const remainingTime = Math.max(0, Math.floor((endTime.getTime() - now.getTime()) / 1000));
+      setTimeLeft(remainingTime);
+      console.log(`Timer recalculated: ${remainingTime} seconds remaining`);
+      return remainingTime;
+    }
+    return 0;
+  };
+
+  // Periodically recalculate timer to ensure accuracy (every 30 seconds)
+  useEffect(() => {
+    if (endTime && timeLeft > 0) {
+      const interval = setInterval(() => {
+        const newTimeLeft = recalculateTimer();
+        if (newTimeLeft === 0) {
+          handleInterviewEnd('Time limit reached');
+        }
+      }, 30000); // Recalculate every 30 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [endTime, timeLeft]);
 
   if (isLoading) {
     return (
@@ -215,162 +559,291 @@ const TextInterviewRoom: React.FC = () => {
     );
   }
 
-  const currentQuestion = questions[currentQuestionIndex];
+  const currentQuestion = getQuestionsInOrder()[currentQuestionIndex];
   const currentAnswer = answers.find(a => a.QuestionId === currentQuestion?.QuestionId);
 
+  // Safety check for when questions are not loaded yet
+  if (!currentQuestion) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex-1 p-6 bg-gray-100 min-h-screen">
-      <div className="w-full max-w-4xl mx-auto flex flex-col gap-6">
-        {/* Header with Timer */}
-        <div className="bg-white p-6 rounded-lg shadow-md flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-full bg-purple-600 flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="w-full h-screen bg-gray-100 flex flex-col">
+      <div className="w-full h-full flex flex-col">
+        {/* Header with Timer - Compact */}
+        <div className="bg-white px-6 py-4 shadow-lg flex justify-between items-center">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">Interview Session</h1>
-              <p className="text-sm text-gray-600">Let's explore your expertise together</p>
+              <h1 className="text-lg font-bold text-gray-800">Interview Session</h1>
+              <p className="text-xs text-gray-600">
+                Question {currentQuestion ? getQuestionLabel(currentQuestion, currentQuestionIndex) : currentQuestionIndex + 1} of {getQuestionsInOrder().length}
+              </p>
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-3 bg-gray-100 px-4 py-2 rounded-full">
-              <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="inline-flex items-center px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-all duration-200">
+              <svg className="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className="text-lg font-semibold text-gray-700">{formatTime(timeLeft)}</span>
+              <span className="font-semibold">{formatTime(timeLeft)}</span>
             </div>
             <button
               onClick={() => setShowExitModal(true)}
-              className="inline-flex items-center px-3 py-1.5 border border-gray-200 rounded-md text-sm font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200"
+              className="inline-flex items-center px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200"
             >
               <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
-              <span>Exit Interview</span>
+              <span>Exit</span>
             </button>
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="w-full bg-gray-200 rounded-full h-2.5">
+        {/* Progress Bar - Full Width */}
+        <div className="w-full bg-gray-200 h-1">
           <div
-            className="bg-purple-600 h-2.5 rounded-full transition-all duration-500"
-            style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
+            className="bg-gradient-to-r from-purple-500 to-purple-600 h-1 transition-all duration-700 ease-out"
+            style={{ width: `${((currentQuestionIndex + 1) / Math.max(getQuestionsInOrder().length, 1)) * 100}%` }}
           ></div>
         </div>
 
-        {/* Question Navigation */}
-        <div className="flex justify-center space-x-2">
-          {questions.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentQuestionIndex(index)}
-              className={`px-3 py-1 rounded-full transition-all duration-300 ${
-                currentQuestionIndex === index
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-200 text-gray-700'
-              }`}
-            >
-              {index + 1}
-            </button>
-          ))}
-        </div>
-
-        {/* Question Card */}
-        <div className="relative">
-          <div className="absolute -left-4 top-0 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold">
-            Q
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow-md ml-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <span className="px-4 py-1.5 text-sm font-medium rounded-full bg-purple-100 text-purple-800">
-                  Question {currentQuestionIndex + 1} of {questions.length}
-                </span>
-                <span className="px-4 py-1.5 text-sm font-medium rounded-full bg-blue-100 text-blue-800">
-                  {currentQuestion.DifficultyLevel === 0 ? 'Internship' : 
-                   currentQuestion.DifficultyLevel === 1 ? 'Junior' : 
-                   currentQuestion.DifficultyLevel === 2 ? 'Mid' : 'Senior'}
-                </span>
+        {/* Main Content Area - Full Height */}
+        <div className="flex-1 flex min-h-0">
+          {/* Foldable Questions Panel */}
+          <div className={`transition-all duration-300 ease-in-out ${
+            isQuestionsPanelCollapsed ? 'w-16' : 'w-80'
+          }`}>
+            <div className="bg-white shadow-lg border-r border-gray-200 flex flex-col h-full">
+              {/* Header with Toggle */}
+              <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-4 py-3 text-white flex items-center justify-between">
+                {!isQuestionsPanelCollapsed && (
+                  <div className="flex items-center justify-between w-full">
+                    <h3 className="text-sm font-semibold">Questions</h3>
+                    <span className="text-xs text-purple-200">
+                      {currentQuestion ? getQuestionLabel(currentQuestion, currentQuestionIndex) : currentQuestionIndex + 1}/{getQuestionsInOrder().length}
+                    </span>
+                  </div>
+                )}
+                <button
+                  onClick={() => setIsQuestionsPanelCollapsed(!isQuestionsPanelCollapsed)}
+                  className={`flex items-center justify-center w-8 h-8 rounded-lg bg-white/20 hover:bg-white/30 transition-all duration-200 ${
+                    isQuestionsPanelCollapsed ? 'ml-0' : 'ml-2'
+                  }`}
+                >
+                  <svg 
+                    className={`w-4 h-4 text-white transition-transform duration-300 ${
+                      isQuestionsPanelCollapsed ? 'rotate-180' : ''
+                    }`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
               </div>
-              <span className="text-sm font-medium text-gray-500">
-                {currentQuestion.QuestionMark} points
-              </span>
-            </div>
-            <p className="text-lg text-gray-900 leading-relaxed">{currentQuestion.QuestionText}</p>
-          </div>
-        </div>
+              
+              {/* Questions List */}
+              <div className={`flex-1 overflow-hidden transition-all duration-300 ${
+                isQuestionsPanelCollapsed ? 'opacity-0' : 'opacity-100'
+              }`}>
+                <div className="p-3 overflow-y-auto h-full">
+                  <div className="space-y-2">
+                    {getQuestionsInOrder().map((question, index) => {
+                      const isMainQuestion = !question.ParentQuestionId;
+                      const isCompleted = completedQuestions.has(question.QuestionId);
+                      const isCurrent = currentQuestionIndex === index;
+                      
+                      return (
+                        <button
+                          key={question.QuestionId}
+                          onClick={() => setCurrentQuestionIndex(index)}
+                          className={`w-full text-left p-3 rounded-lg transition-all duration-200 group ${
+                            isCurrent
+                              ? 'bg-purple-50 border-2 border-purple-200 shadow-sm'
+                              : isCompleted
+                              ? 'bg-green-50 border border-green-200 hover:bg-green-100'
+                              : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
+                          } ${isMainQuestion ? 'ml-0' : 'ml-4'}`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${
+                              isCurrent
+                                ? 'bg-purple-500 text-white'
+                                : isCompleted
+                                ? 'bg-green-500 text-white'
+                                : 'bg-gray-300 text-gray-600'
+                            }`}>
+                              {getQuestionLabel(question, index)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <span className={`text-sm font-medium truncate ${
+                                  isCurrent ? 'text-purple-800' : 'text-gray-700'
+                                }`}>
+                                  {isMainQuestion ? `Question ${getQuestionLabel(question, index)}` : `Question ${getQuestionLabel(question, index)}`}
+                                </span>
+                                <span className="text-xs text-gray-500">{question.QuestionMark}p</span>
+                              </div>
+                              <div className="flex items-center space-x-2 mt-1">
+                                <span className={`px-2 py-0.5 rounded-full text-xs ${
+                                  question.DifficultyLevel === 0 ? 'bg-blue-100 text-blue-700' :
+                                  question.DifficultyLevel === 1 ? 'bg-green-100 text-green-700' :
+                                  question.DifficultyLevel === 2 ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-red-100 text-red-700'
+                                }`}>
+                                  {question.DifficultyLevel === 0 ? 'Intern' : 
+                                   question.DifficultyLevel === 1 ? 'Junior' : 
+                                   question.DifficultyLevel === 2 ? 'Mid' : 'Senior'}
+                                </span>
+                                {isCompleted && (
+                                  <span className="text-xs text-green-600 font-medium">✓</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
 
-        {/* Answer Section */}
-        <div className="relative">
-          <div className="absolute -left-4 top-0 w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-white font-bold">
-            A
+              {/* Collapsed State Indicator */}
+              {isQuestionsPanelCollapsed && (
+                <div className="flex-1 flex flex-col items-center justify-center p-2">
+                  <div className="w-8 h-8 rounded-lg bg-purple-500 text-white flex items-center justify-center text-sm font-bold mb-2">
+                    {currentQuestionIndex + 1}
+                  </div>
+                  <div className="text-xs text-gray-500 text-center">
+                    {currentQuestionIndex + 1}/{questions.length}
+                  </div>
+                  <div className="mt-2 text-xs text-gray-400 text-center">
+                    Click to expand
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="bg-white p-6 rounded-lg shadow-md ml-4">
-            <div className="space-y-6">
-              <div>
-                <label htmlFor="answer" className="block text-sm font-medium text-gray-700 mb-2">
-                  Your Answer
-                </label>
-                <div className="relative">
-                  <textarea
-                    id="answer"
-                    rows={6}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-                    placeholder="Share your thoughts and expertise..."
-                    value={currentAnswer?.UserAnswerText || ''}
-                    onChange={(e) => handleAnswerChange(e.target.value)}
-                  />
-                  <div className="absolute bottom-3 right-3 text-xs text-gray-400">
-                    Press Enter to submit
+
+          {/* Right Side - Question and Answer - Full Width */}
+          <div className="flex-1 flex flex-col bg-white">
+            {/* Current Question Header */}
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-8 py-6 text-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                    <span className="text-xl font-bold">{currentQuestionIndex + 1}</span>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">Current Question</h3>
+                    <p className="text-sm text-indigo-200">Share your expertise</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-indigo-200">Difficulty</div>
+                  <div className="text-lg font-bold">
+                    {currentQuestion.DifficultyLevel === 0 ? 'Internship' : 
+                     currentQuestion.DifficultyLevel === 1 ? 'Junior' : 
+                     currentQuestion.DifficultyLevel === 2 ? 'Mid' : 'Senior'}
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+            
+            {/* Question and Answer Content */}
+            <div className="flex-1 flex flex-col p-8">
+              {/* Question Display */}
+              <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-6">
+                <div className="flex items-start space-x-4">
+                  <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0 mt-1">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xl text-gray-900 leading-relaxed font-medium">{currentQuestion.QuestionText}</p>
+                    <div className="flex items-center space-x-4 mt-4">
+                      <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-full shadow-sm border border-gray-200">
+                        <span className="text-sm font-medium text-gray-600">Points:</span>
+                        <span className="text-lg font-bold text-purple-600">{currentQuestion.QuestionMark}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-        {/* Navigation Buttons */}
-        <div className="flex justify-between items-center pt-4">
-          <button
-            onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
-            disabled={currentQuestionIndex === 0}
-            className="group px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center space-x-2"
-          >
-            <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-            </svg>
-            <span>Previous Question</span>
-          </button>
-          <button
-            onClick={handleSubmitAnswer}
-            disabled={isSubmitting || !currentAnswer?.UserAnswerText}
-            className="group px-8 py-3 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center space-x-2"
-          >
-            {isSubmitting ? (
-              <>
-                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Processing...</span>
-              </>
-            ) : (
-              <>
-                <span>{currentAnswer && currentAnswer.UserAnswerId > 0 ? 'Update Answer' : 'Submit Answer'}</span>
-                <svg className="w-5 h-5 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </>
-            )}
-          </button>
+              {/* Answer Section */}
+              <div className="flex-1 flex flex-col">
+                <div className="bg-white border-2 border-gray-200 rounded-xl flex-1 flex flex-col">
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-xl">
+                    <label htmlFor="answer" className="block text-lg font-medium text-gray-700">
+                      Your Answer
+                    </label>
+                  </div>
+                  <div className="flex-1 p-6">
+                    <textarea
+                      id="answer"
+                      className="w-full h-full resize-none border-0 focus:ring-0 focus:outline-none text-gray-900 placeholder-gray-400 text-lg leading-relaxed"
+                      placeholder="Share your thoughts and expertise..."
+                      value={currentAnswer?.UserAnswerText || ''}
+                      onChange={(e) => handleAnswerChange(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Navigation Buttons */}
+              <div className="flex justify-between items-center mt-6">
+                <button
+                  onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+                  disabled={currentQuestionIndex === 0}
+                  className="group px-8 py-4 text-base font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center space-x-3"
+                >
+                  <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>Previous Question</span>
+                </button>
+                <button
+                  onClick={handleSubmitAnswer}
+                  disabled={isSubmitting || !currentAnswer?.UserAnswerText}
+                  className="group px-10 py-4 text-base font-medium text-white bg-purple-600 rounded-xl hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center space-x-3"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{currentAnswer && currentAnswer.UserAnswerId > 0 ? 'Change Answer' : 'Submit Answer'}</span>
+                      <svg className="w-5 h-5 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="p-4 bg-red-50 border-t border-red-200">
             <div className="flex items-center space-x-2">
               <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -382,7 +855,7 @@ const TextInterviewRoom: React.FC = () => {
 
         {/* Exit Confirmation Modal */}
         {showExitModal && (
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 Exit Interview
@@ -400,7 +873,7 @@ const TextInterviewRoom: React.FC = () => {
                 <button
                   onClick={() => {
                     setShowExitModal(false);
-                    navigate('/interviews');
+                    handleInterviewEnd('User exited');
                   }}
                   className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                 >

@@ -111,7 +111,7 @@ const Sidebar: React.FC = () => {
                 </div>
               )}
               <div>
-                <h2 className="text-lg font-semibold text-gray-800">
+                <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
                   {userDetails.firstName} {userDetails.lastName}
                 </h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">{userDetails.professionalTitle}</p>
