@@ -239,14 +239,22 @@ const Interviews: React.FC = () => {
         const interviewId = interview.InterviewId || interview.interviewId;
         const interviewType = interview.InterviewType || interview.interviewType || 0;
         const isFinished = interview.IsFinished || interview.isFinished || false;
+        const finishedAt = interview.FinishedAt || interview.finishedAt;
 
         // Ensure interviewType is a string and has a default value
         const interviewTypeStr = interviewType.toString();
         const interviewTypeName = interviewTypeStr === '0' ? 'Chat' : 'Voice';
 
-        // Calculate status based on isFinished field (backend handles 45-minute expiration)
+        // Calculate status based on isFinished field and FinishedAt timestamp
         let status: 'scheduled' | 'completed' | 'incomplete';
-        if (isFinished) {
+        let actualIsFinished = isFinished;
+        
+        // If isFinished is false but we have a FinishedAt timestamp, consider it finished
+        if (!isFinished && finishedAt) {
+          actualIsFinished = true;
+        }
+        
+        if (actualIsFinished) {
           status = 'completed';
         } else {
           status = 'incomplete';
@@ -259,6 +267,8 @@ const Interviews: React.FC = () => {
           interviewMark,
           startedAt,
           isFinished,
+          actualIsFinished,
+          finishedAt,
           status,
           localTime: new Date(startedAt).toLocaleString('en-US'),
           isoString: new Date(startedAt).toISOString()
@@ -277,7 +287,7 @@ const Interviews: React.FC = () => {
           mark: interviewMark,
           interviewType: interviewType,
           startedAt: startedAt,
-          isFinished: isFinished
+          isFinished: actualIsFinished
         };
       }));
     } catch (error) {
@@ -521,11 +531,25 @@ const Interviews: React.FC = () => {
                     key={interview.id} 
                     className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer hover:border-purple-300 dark:hover:border-purple-600 group"
                     onClick={() => {
-                      // Navigate directly to the interview view
-                      if (interview.interviewType === 0) {
-                        navigate(`/interview/text/${interview.id}`);
+                      console.log('Interview clicked:', {
+                        id: interview.id,
+                        isFinished: interview.isFinished,
+                        status: interview.status,
+                        interviewType: interview.interviewType
+                      });
+                      
+                      // For completed interviews, navigate to details page
+                      if (interview.isFinished) {
+                        console.log('Navigating to details page for completed interview');
+                        navigate(`/interview/details/${interview.id}`);
                       } else {
-                        navigate(`/interview/voice/${interview.id}`);
+                        console.log('Navigating to interview room for ongoing interview');
+                        // For ongoing interviews, navigate to the interview room
+                        if (interview.interviewType === 0) {
+                          navigate(`/interview/text/${interview.id}`);
+                        } else {
+                          navigate(`/interview/voice/${interview.id}`);
+                        }
                       }
                     }}
                   >
@@ -593,7 +617,7 @@ const Interviews: React.FC = () => {
                         
                         {/* Click hint */}
                         <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                          Click to view full interview
+                          {interview.isFinished ? 'Click to view interview details' : 'Click to view full interview'}
                         </div>
                       </div>
                       
@@ -652,7 +676,7 @@ const Interviews: React.FC = () => {
                         )}
                         {/* Show completion message for finished interviews */}
                         {interview.isFinished && (
-                          <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg text-sm font-semibold shadow-sm">
+                          <div className="inline-flex items-center px-4 py-2 bg-white dark:bg-green-900/20 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg text-sm font-semibold shadow-sm">
                             <CheckCircleIcon className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
                             <span className="font-bold">{interview.mark}%</span>
                             <span className="ml-1 text-green-600 dark:text-green-400">Score</span>

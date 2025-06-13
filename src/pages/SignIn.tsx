@@ -275,7 +275,7 @@ const SignIn: React.FC = () => {
           <div className="border-t border-gray-300 w-5/12"></div>
         </div>
 
-        <div>
+        <div className="w-full">
           <GoogleLogin
             onSuccess={handleGoogleSuccess}
             onError={handleGoogleError}
@@ -283,7 +283,6 @@ const SignIn: React.FC = () => {
             theme="outline"
             text="continue_with"
             shape="rectangular"
-            width="100%"
             type="standard"
             logo_alignment="left"
             locale="en"

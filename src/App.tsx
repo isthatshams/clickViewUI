@@ -23,8 +23,12 @@ import AboutUs from './pages/AboutUs';
 import Features from './pages/Features';
 
 const App: React.FC = () => {
+  // Use environment variable or fallback to the current client ID
+  const googleClientId = import.meta.env?.VITE_GOOGLE_CLIENT_ID || 
+                        "546063441484-565u7vmohghbkbko0rsjve0sh76500f1.apps.googleusercontent.com";
+  
   return (
-    <GoogleOAuthProvider clientId="546063441484-565u7vmohghbkbko0rsjve0sh76500f1.apps.googleusercontent.com">
+    <GoogleOAuthProvider clientId={googleClientId}>
       <ThemeProvider>
         <Router>
           <SidebarProvider>

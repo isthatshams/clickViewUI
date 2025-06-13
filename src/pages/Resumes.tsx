@@ -504,20 +504,25 @@ const Resumes: React.FC = () => {
   };
 
   const handleEnhanceSubmit = async () => {
-    if (!selectedResume || !jobTitle.trim()) return;
+    if (!selectedResume) return;
 
     setIsEnhancing(true);
     setStatusMessage(null);
 
     try {
       const token = await getValidToken();
-      const response = await fetch(`https://localhost:7127/api/CV/${selectedResume.id}/enhance`, {
-        method: 'POST',
+      
+      // Use the new enhancement endpoint that automatically creates enhancements
+      const endpoint = jobTitle.trim() 
+        ? `https://localhost:7127/api/CV/${selectedResume.id}/enhancement/${encodeURIComponent(jobTitle.trim())}`
+        : `https://localhost:7127/api/CV/${selectedResume.id}/enhancement`;
+        
+      const response = await fetch(endpoint, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ jobTitle: jobTitle.trim() })
       });
 
       if (!response.ok) {
@@ -531,8 +536,15 @@ const Resumes: React.FC = () => {
       }
 
       const result = await response.json();
-      setEnhancement(result);
-      showStatus('success', 'Resume enhanced successfully');
+      setEnhancement({
+        suggestions: result.suggestions,
+        enhancedCvText: result.enhancedCvText
+      });
+      
+      const successMessage = jobTitle.trim() 
+        ? `Resume enhanced for ${jobTitle.trim()} position`
+        : 'Resume enhanced successfully';
+      showStatus('success', successMessage);
     } catch (error) {
       console.error('Error enhancing resume:', error);
       showStatus('error', 'Failed to enhance resume');
@@ -905,16 +917,19 @@ const Resumes: React.FC = () => {
                 <div className="space-y-4">
                   <div>
                     <label htmlFor="jobTitle" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Target Job Title
+                      Target Job Title (Optional)
                     </label>
                     <input
                       type="text"
                       id="jobTitle"
                       value={jobTitle}
                       onChange={(e) => setJobTitle(e.target.value)}
-                      placeholder="e.g., Senior Software Engineer"
+                      placeholder="e.g., Senior Software Engineer (leave empty for general enhancement)"
                       className="mt-1 block w-full border border-gray-200 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
                     />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Leave empty for a general enhancement, or specify a job title for targeted improvements.
+                    </p>
                   </div>
                   <div className="flex justify-end space-x-3">
                     <button
@@ -925,9 +940,9 @@ const Resumes: React.FC = () => {
                     </button>
                     <button
                       onClick={handleEnhanceSubmit}
-                      disabled={isEnhancing || !jobTitle.trim()}
+                      disabled={isEnhancing}
                       className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                        isEnhancing || !jobTitle.trim()
+                        isEnhancing
                           ? 'bg-purple-400 cursor-not-allowed'
                           : 'bg-purple-600 hover:bg-purple-700'
                       } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500`}
