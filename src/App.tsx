@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { SidebarProvider } from './context/SidebarContext';
+import { ThemeProvider } from './context/ThemeContext';
 import AuthenticatedLayout from './components/AuthenticatedLayout';
 
 // Pages
@@ -24,28 +25,30 @@ import Features from './pages/Features';
 const App: React.FC = () => {
   return (
     <GoogleOAuthProvider clientId="546063441484-565u7vmohghbkbko0rsjve0sh76500f1.apps.googleusercontent.com">
-    <Router>
-      <SidebarProvider>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-            <Route path="/about" element={<AboutUs />} />
-            <Route path="/features" element={<Features />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/two-factor-auth" element={<TwoFactorAuth />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/check-email" element={<CheckEmail />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/dashboard" element={<AuthenticatedLayout><Dashboard /></AuthenticatedLayout>} />
-          <Route path="/settings" element={<AuthenticatedLayout><Settings /></AuthenticatedLayout>} />
-          <Route path="/resumes" element={<AuthenticatedLayout><Resumes /></AuthenticatedLayout>} />
-          <Route path="/interviews" element={<AuthenticatedLayout><Interviews /></AuthenticatedLayout>} />
-            <Route path="/interview/text/:interviewId" element={<TextInterviewRoom />} />
-            <Route path="/interview/voice/:interviewId" element={<InterviewRoom />} />
-            <Route path="/interview/room/:interviewId" element={<InterviewRoom />} />
-        </Routes>
-      </SidebarProvider>
-    </Router>
+      <ThemeProvider>
+        <Router>
+          <SidebarProvider>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+                <Route path="/about" element={<AboutUs />} />
+                <Route path="/features" element={<Features />} />
+              <Route path="/signup" element={<SignUp />} />
+              <Route path="/signin" element={<SignIn />} />
+              <Route path="/two-factor-auth" element={<TwoFactorAuth />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/check-email" element={<CheckEmail />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/dashboard" element={<AuthenticatedLayout><Dashboard /></AuthenticatedLayout>} />
+              <Route path="/settings" element={<AuthenticatedLayout><Settings /></AuthenticatedLayout>} />
+              <Route path="/resumes" element={<AuthenticatedLayout><Resumes /></AuthenticatedLayout>} />
+              <Route path="/interviews" element={<AuthenticatedLayout><Interviews /></AuthenticatedLayout>} />
+                <Route path="/interview/text/:interviewId" element={<TextInterviewRoom />} />
+                <Route path="/interview/voice/:interviewId" element={<InterviewRoom />} />
+                <Route path="/interview/room/:interviewId" element={<InterviewRoom />} />
+            </Routes>
+          </SidebarProvider>
+        </Router>
+      </ThemeProvider>
     </GoogleOAuthProvider>
   );
 };

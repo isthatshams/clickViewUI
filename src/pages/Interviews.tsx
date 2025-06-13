@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { getValidToken, getUserDetails } from '../utils/auth';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../context/ThemeContext';
 
 interface MockInterview {
   id: string;
@@ -58,6 +59,7 @@ interface CV {
 
 const Interviews: React.FC = () => {
   const navigate = useNavigate();
+  const { theme } = useTheme();
   const [mockInterviews, setMockInterviews] = useState<MockInterview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -650,9 +652,10 @@ const Interviews: React.FC = () => {
                         )}
                         {/* Show completion message for finished interviews */}
                         {interview.isFinished && (
-                          <div className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium">
-                            <CheckCircleIcon className="h-4 w-4 mr-2" />
-                            Interview Completed
+                          <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg text-sm font-semibold shadow-sm">
+                            <CheckCircleIcon className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
+                            <span className="font-bold">{interview.mark}%</span>
+                            <span className="ml-1 text-green-600 dark:text-green-400">Score</span>
                           </div>
                         )}
                       </div>
@@ -958,13 +961,19 @@ const Interviews: React.FC = () => {
 
         {/* Summary Modal */}
         {showPreviewModal && selectedInterview && (
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg p-6 max-w-4xl w-full h-5/6 flex flex-col">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className={`rounded-xl p-6 max-w-4xl w-full h-5/6 flex flex-col ${
+              theme === 'dark' ? 'bg-gray-900 border border-gray-700' : 'bg-white'
+            }`}>
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Interview Summary</h3>
+                <h3 className={`text-lg font-medium ${
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                }`}>Interview Summary</h3>
                 <button
                   onClick={() => setShowPreviewModal(false)}
-                  className="text-gray-400 hover:text-gray-500"
+                  className={`hover:text-gray-500 ${
+                    theme === 'dark' ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400 hover:text-gray-500'
+                  }`}
                 >
                   <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -974,16 +983,28 @@ const Interviews: React.FC = () => {
 
               <div className="flex-grow overflow-auto space-y-6">
                 {/* Progress Summary */}
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Summary</h4>
+                <div className={`rounded-lg p-4 ${
+                  theme === 'dark' ? 'bg-gray-800 border border-gray-600' : 'bg-gray-50'
+                }`}>
+                  <h4 className={`text-sm font-medium mb-2 ${
+                    theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                  }`}>Summary</h4>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-gray-500">Total Questions:</span>
-                      <span className="ml-2 font-medium">{selectedInterview.questions?.length || 0}</span>
+                      <span className={`${
+                        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                      }`}>Total Questions:</span>
+                      <span className={`ml-2 font-medium ${
+                        theme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}>{selectedInterview.questions?.length || 0}</span>
                     </div>
                     <div>
-                      <span className="text-gray-500">Answered:</span>
-                      <span className="ml-2 font-medium">{selectedInterview.answers?.length || 0}</span>
+                      <span className={`${
+                        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                      }`}>Answered:</span>
+                      <span className={`ml-2 font-medium ${
+                        theme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}>{selectedInterview.answers?.length || 0}</span>
                     </div>
                   </div>
                 </div>
@@ -991,25 +1012,43 @@ const Interviews: React.FC = () => {
                 {/* Questions and Answers */}
                 {selectedInterview.questions && (
                   <div>
-                    <h4 className="text-sm font-medium text-gray-700 mb-3">Questions & Answers</h4>
+                    <h4 className={`text-sm font-medium mb-3 ${
+                      theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                    }`}>Questions & Answers</h4>
                     <div className="space-y-4 max-h-96 overflow-auto">
                       {selectedInterview.questions.map((question, index) => {
                         const answer = selectedInterview.answers?.find(a => a.questionId === question.questionId);
                         return (
-                          <div key={question.questionId} className="border border-gray-200 rounded-lg p-4">
+                          <div key={question.questionId} className={`border rounded-lg p-4 ${
+                            theme === 'dark' ? 'border-gray-600 bg-gray-800' : 'border-gray-200'
+                          }`}>
                             <div className="flex items-start space-x-3">
                               <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-white text-xs font-medium">
                                 {index + 1}
                               </div>
                               <div className="flex-1">
-                                <p className="text-sm font-medium text-gray-900 mb-2">{question.questionText}</p>
+                                <p className={`text-sm font-medium mb-2 ${
+                                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                                }`}>{question.questionText}</p>
                                 {answer ? (
-                                  <div className="bg-green-50 border border-green-200 rounded-md p-3">
-                                    <p className="text-sm text-gray-700">{answer.userAnswerText}</p>
+                                  <div className={`border rounded-md p-3 ${
+                                    theme === 'dark' 
+                                      ? 'bg-green-900/20 border-green-500/30' 
+                                      : 'bg-green-50 border-green-200'
+                                  }`}>
+                                    <p className={`text-sm ${
+                                      theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                                    }`}>{answer.userAnswerText}</p>
                                   </div>
                                 ) : (
-                                  <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
-                                    <p className="text-sm text-gray-500 italic">Not answered yet</p>
+                                  <div className={`border rounded-md p-3 ${
+                                    theme === 'dark' 
+                                      ? 'bg-gray-700 border-gray-600' 
+                                      : 'bg-gray-50 border-gray-200'
+                                  }`}>
+                                    <p className={`text-sm italic ${
+                                      theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                                    }`}>Not answered yet</p>
                                   </div>
                                 )}
                               </div>
@@ -1024,31 +1063,65 @@ const Interviews: React.FC = () => {
                 {/* AI Analysis */}
                 {interviewSummary && (
                   <div>
-                    <h4 className="text-sm font-medium text-gray-700 mb-3">Analysis</h4>
+                    <h4 className={`text-sm font-medium mb-3 ${
+                      theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                    }`}>Analysis</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <h5 className="text-sm font-medium text-blue-800 mb-2">Overall Tone</h5>
-                        <p className="text-sm text-blue-700">{interviewSummary.overallTone || 'Not available'}</p>
+                      <div className={`border rounded-lg p-4 ${
+                        theme === 'dark' 
+                          ? 'bg-blue-900/20 border-blue-500/30' 
+                          : 'bg-blue-50 border-blue-200'
+                      }`}>
+                        <h5 className={`text-sm font-medium mb-2 ${
+                          theme === 'dark' ? 'text-blue-300' : 'text-blue-800'
+                        }`}>Overall Tone</h5>
+                        <p className={`text-sm ${
+                          theme === 'dark' ? 'text-blue-200' : 'text-blue-700'
+                        }`}>{interviewSummary.overallTone || 'Not available'}</p>
                       </div>
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <h5 className="text-sm font-medium text-green-800 mb-2">Dominant Personality Traits</h5>
-                        <p className="text-sm text-green-700">
+                      <div className={`border rounded-lg p-4 ${
+                        theme === 'dark' 
+                          ? 'bg-green-900/20 border-green-500/30' 
+                          : 'bg-green-50 border-green-200'
+                      }`}>
+                        <h5 className={`text-sm font-medium mb-2 ${
+                          theme === 'dark' ? 'text-green-300' : 'text-green-800'
+                        }`}>Dominant Personality Traits</h5>
+                        <p className={`text-sm ${
+                          theme === 'dark' ? 'text-green-200' : 'text-green-700'
+                        }`}>
                           {Array.isArray(interviewSummary.dominantPersonalityTraits)
                             ? interviewSummary.dominantPersonalityTraits.join(', ')
                             : 'Not available'}
                         </p>
                       </div>
-                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                        <h5 className="text-sm font-medium text-purple-800 mb-2">Dominant Soft Skills</h5>
-                        <p className="text-sm text-purple-700">
+                      <div className={`border rounded-lg p-4 ${
+                        theme === 'dark' 
+                          ? 'bg-purple-900/20 border-purple-500/30' 
+                          : 'bg-purple-50 border-purple-200'
+                      }`}>
+                        <h5 className={`text-sm font-medium mb-2 ${
+                          theme === 'dark' ? 'text-purple-300' : 'text-purple-800'
+                        }`}>Dominant Soft Skills</h5>
+                        <p className={`text-sm ${
+                          theme === 'dark' ? 'text-purple-200' : 'text-purple-700'
+                        }`}>
                           {Array.isArray(interviewSummary.dominantSoftSkills)
                             ? interviewSummary.dominantSoftSkills.join(', ')
                             : 'Not available'}
                         </p>
                       </div>
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                        <h5 className="text-sm font-medium text-yellow-800 mb-2">Strengths</h5>
-                        <p className="text-sm text-yellow-700">
+                      <div className={`border rounded-lg p-4 ${
+                        theme === 'dark' 
+                          ? 'bg-yellow-900/20 border-yellow-500/30' 
+                          : 'bg-yellow-50 border-yellow-200'
+                      }`}>
+                        <h5 className={`text-sm font-medium mb-2 ${
+                          theme === 'dark' ? 'text-yellow-300' : 'text-yellow-800'
+                        }`}>Strengths</h5>
+                        <p className={`text-sm ${
+                          theme === 'dark' ? 'text-yellow-200' : 'text-yellow-700'
+                        }`}>
                           {Array.isArray(interviewSummary.strengths)
                             ? interviewSummary.strengths.join(', ')
                             : 'Not available'}
@@ -1061,7 +1134,9 @@ const Interviews: React.FC = () => {
                 {isLoadingSummary && (
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
-                    <span className="ml-3 text-sm text-gray-600">Loading summary...</span>
+                    <span className={`ml-3 text-sm ${
+                      theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                    }`}>Loading summary...</span>
                   </div>
                 )}
               </div>
@@ -1069,7 +1144,11 @@ const Interviews: React.FC = () => {
               <div className="mt-6 flex justify-end">
                 <button
                   onClick={() => setShowPreviewModal(false)}
-                  className="px-4 py-2 border border-gray-200 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className={`px-4 py-2 border rounded-md text-sm font-medium transition-all duration-200 ${
+                    theme === 'dark' 
+                      ? 'border-gray-600 text-gray-300 bg-gray-800 hover:bg-gray-700' 
+                      : 'border-gray-200 text-gray-700 bg-white hover:bg-gray-50'
+                  }`}
                 >
                   Close
                 </button>

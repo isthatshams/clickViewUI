@@ -13,6 +13,7 @@ import {
   PhotoIcon,
 } from '@heroicons/react/24/solid';
 import { getUserDetails, updateProfile, uploadProfilePicture, changePassword, updatePrivacySettings, deleteAccount, getPrivacySettings } from '../utils/auth';
+import { useTheme } from '../context/ThemeContext';
 
 interface ProfileData {
   firstName: string;
@@ -51,6 +52,8 @@ interface FormErrors {
 
 const Settings: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { theme, toggleTheme } = useTheme();
+  
   const [profileData, setProfileData] = useState<ProfileData>({
     firstName: '',
     lastName: '',
@@ -66,16 +69,11 @@ const Settings: React.FC = () => {
   });
 
   const [preferencesData, setPreferencesData] = useState<PreferencesData>(() => {
-    // Get theme from localStorage or default to 'light'
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' || 'light';
+    // Get language from localStorage or default to 'English'
     const savedLanguage = localStorage.getItem('language') as 'English' | 'Arabic' || 'English';
     
-    // Apply theme immediately on component mount
-    document.documentElement.classList.remove('light', 'dark');
-    document.documentElement.classList.add(savedTheme);
-    
     return {
-      theme: savedTheme,
+      theme: theme, // Use theme from context
       language: savedLanguage,
     };
   });
@@ -93,11 +91,13 @@ const Settings: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
 
+  // Update preferencesData when theme changes
   useEffect(() => {
-    document.documentElement.classList.remove('light', 'dark');
-    document.documentElement.classList.add(preferencesData.theme);
-    localStorage.setItem('theme', preferencesData.theme);
-  }, [preferencesData.theme]);
+    setPreferencesData(prev => ({
+      ...prev,
+      theme: theme
+    }));
+  }, [theme]);
 
   useEffect(() => {
     localStorage.setItem('language', preferencesData.language);
@@ -551,16 +551,16 @@ const Settings: React.FC = () => {
                 <div className="flex space-x-4">
                   <button
                     type="button"
-                    onClick={() => handlePreferencesChange('theme', 'light')}
-                    className={`flex items-center px-4 py-2 rounded-lg border transition-colors ${preferencesData.theme === 'light' ? 'bg-purple-50 border-purple-500 text-purple-700 dark:bg-purple-900 dark:border-purple-700 dark:text-purple-300' : 'border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'}`}
+                    onClick={() => theme !== 'light' && toggleTheme()}
+                    className={`flex items-center px-4 py-2 rounded-lg border transition-colors ${theme === 'light' ? 'bg-purple-50 border-purple-500 text-purple-700 dark:bg-purple-900 dark:border-purple-700 dark:text-purple-300' : 'border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'}`}
                   >
                     <SunIcon className="h-5 w-5 mr-2 text-gray-700 dark:text-purple-300 light:text-gray-700" />
                     Light
                   </button>
                   <button
                     type="button"
-                    onClick={() => handlePreferencesChange('theme', 'dark')}
-                    className={`flex items-center px-4 py-2 rounded-lg border transition-colors ${preferencesData.theme === 'dark' ? 'bg-purple-50 border-purple-500 text-purple-700 dark:bg-purple-900 dark:border-purple-700 dark:text-purple-300' : 'border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'}`}
+                    onClick={() => theme !== 'dark' && toggleTheme()}
+                    className={`flex items-center px-4 py-2 rounded-lg border transition-colors ${theme === 'dark' ? 'bg-purple-50 border-purple-500 text-purple-700 dark:bg-purple-900 dark:border-purple-700 dark:text-purple-300' : 'border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'}`}
                   >
                     <MoonIcon className="h-5 w-5 mr-2 text-gray-700 dark:text-purple-300 light:text-gray-700" />
                     Dark

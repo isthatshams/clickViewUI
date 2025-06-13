@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getValidToken } from '../utils/auth';
+import { useTheme } from '../context/ThemeContext';
 
 interface Question {
   QuestionId: number;
@@ -20,6 +21,7 @@ interface Answer {
 const TextInterviewRoom: React.FC = () => {
   const { interviewId } = useParams<{ interviewId: string }>();
   const navigate = useNavigate();
+  const { theme } = useTheme();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -545,16 +547,27 @@ const TextInterviewRoom: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+      <div className={`flex items-center justify-center min-h-screen ${theme === 'dark' ? 'bg-black' : 'bg-gray-100'}`}>
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-purple-500"></div>
+          <p className={`text-lg ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Loading interview...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-red-600">{error}</div>
+      <div className={`flex items-center justify-center min-h-screen ${theme === 'dark' ? 'bg-black' : 'bg-gray-100'}`}>
+        <div className={`p-8 rounded-lg border max-w-md w-full ${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`}>
+          <div className="text-red-400 text-center">
+            <svg className="mx-auto h-12 w-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <p className="text-lg font-semibold mb-2">Error</p>
+            <p className="text-sm">{error}</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -565,17 +578,22 @@ const TextInterviewRoom: React.FC = () => {
   // Safety check for when questions are not loaded yet
   if (!currentQuestion) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+      <div className={`flex items-center justify-center min-h-screen ${theme === 'dark' ? 'bg-black' : 'bg-gray-100'}`}>
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-purple-500"></div>
+          <p className={`text-lg ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Loading questions...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-screen bg-gray-100 flex flex-col">
+    <div className={`w-full h-screen flex flex-col ${theme === 'dark' ? 'bg-black' : 'bg-gray-100'}`}>
       <div className="w-full h-full flex flex-col">
         {/* Header with Timer - Compact */}
-        <div className="bg-white px-6 py-4 shadow-lg flex justify-between items-center">
+        <div className={`border-b px-6 py-4 shadow-2xl flex justify-between items-center ${
+          theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -583,22 +601,26 @@ const TextInterviewRoom: React.FC = () => {
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-gray-800">Interview Session</h1>
-              <p className="text-xs text-gray-600">
+              <h1 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>Interview Session</h1>
+              <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                 Question {currentQuestion ? getQuestionLabel(currentQuestion, currentQuestionIndex) : currentQuestionIndex + 1} of {getQuestionsInOrder().length}
               </p>
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <div className="inline-flex items-center px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-all duration-200">
-              <svg className="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className={`inline-flex items-center px-3 py-1.5 border rounded-lg text-sm font-medium transition-all duration-200 ${
+              theme === 'dark' 
+                ? 'border-gray-600 text-gray-300 bg-gray-800 hover:bg-gray-700' 
+                : 'border-gray-200 text-gray-700 bg-white hover:bg-gray-50'
+            }`}>
+              <svg className="w-4 h-4 mr-2 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span className="font-semibold">{formatTime(timeLeft)}</span>
             </div>
             <button
               onClick={() => setShowExitModal(true)}
-              className="inline-flex items-center px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200"
+              className="inline-flex items-center px-3 py-1.5 border border-red-500/30 rounded-lg text-sm font-medium text-red-400 bg-red-900/20 hover:bg-red-900/40 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all duration-200"
             >
               <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -609,9 +631,9 @@ const TextInterviewRoom: React.FC = () => {
         </div>
 
         {/* Progress Bar - Full Width */}
-        <div className="w-full bg-gray-200 h-1">
+        <div className={`w-full h-1 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'}`}>
           <div
-            className="bg-gradient-to-r from-purple-500 to-purple-600 h-1 transition-all duration-700 ease-out"
+            className="bg-gradient-to-r from-purple-500 to-blue-500 h-1 transition-all duration-700 ease-out"
             style={{ width: `${((currentQuestionIndex + 1) / Math.max(getQuestionsInOrder().length, 1)) * 100}%` }}
           ></div>
         </div>
@@ -622,9 +644,11 @@ const TextInterviewRoom: React.FC = () => {
           <div className={`transition-all duration-300 ease-in-out ${
             isQuestionsPanelCollapsed ? 'w-16' : 'w-80'
           }`}>
-            <div className="bg-white shadow-lg border-r border-gray-200 flex flex-col h-full">
+            <div className={`shadow-2xl border-r flex flex-col h-full ${
+              theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
+            }`}>
               {/* Header with Toggle */}
-              <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-4 py-3 text-white flex items-center justify-between">
+              <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-3 text-white flex items-center justify-between">
                 {!isQuestionsPanelCollapsed && (
                   <div className="flex items-center justify-between w-full">
                     <h3 className="text-sm font-semibold">Questions</h3>
@@ -669,9 +693,11 @@ const TextInterviewRoom: React.FC = () => {
                           onClick={() => setCurrentQuestionIndex(index)}
                           className={`w-full text-left p-3 rounded-lg transition-all duration-200 group ${
                             isCurrent
-                              ? 'bg-purple-50 border-2 border-purple-200 shadow-sm'
+                              ? 'bg-purple-900/30 border-2 border-purple-500/50 shadow-lg'
                               : isCompleted
-                              ? 'bg-green-50 border border-green-200 hover:bg-green-100'
+                              ? 'bg-green-900/20 border border-green-500/30 hover:bg-green-900/30'
+                              : theme === 'dark'
+                              ? 'bg-gray-800 border border-gray-600 hover:bg-gray-700'
                               : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
                           } ${isMainQuestion ? 'ml-0' : 'ml-4'}`}
                         >
@@ -681,6 +707,8 @@ const TextInterviewRoom: React.FC = () => {
                                 ? 'bg-purple-500 text-white'
                                 : isCompleted
                                 ? 'bg-green-500 text-white'
+                                : theme === 'dark'
+                                ? 'bg-gray-600 text-gray-300'
                                 : 'bg-gray-300 text-gray-600'
                             }`}>
                               {getQuestionLabel(question, index)}
@@ -688,25 +716,29 @@ const TextInterviewRoom: React.FC = () => {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
                                 <span className={`text-sm font-medium truncate ${
-                                  isCurrent ? 'text-purple-800' : 'text-gray-700'
+                                  isCurrent 
+                                    ? 'text-purple-300' 
+                                    : theme === 'dark' 
+                                    ? 'text-gray-300' 
+                                    : 'text-gray-700'
                                 }`}>
                                   {isMainQuestion ? `Question ${getQuestionLabel(question, index)}` : `Question ${getQuestionLabel(question, index)}`}
                                 </span>
-                                <span className="text-xs text-gray-500">{question.QuestionMark}p</span>
+                                <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{question.QuestionMark}p</span>
                               </div>
                               <div className="flex items-center space-x-2 mt-1">
                                 <span className={`px-2 py-0.5 rounded-full text-xs ${
-                                  question.DifficultyLevel === 0 ? 'bg-blue-100 text-blue-700' :
-                                  question.DifficultyLevel === 1 ? 'bg-green-100 text-green-700' :
-                                  question.DifficultyLevel === 2 ? 'bg-yellow-100 text-yellow-700' :
-                                  'bg-red-100 text-red-700'
+                                  question.DifficultyLevel === 0 ? 'bg-blue-900/30 text-blue-300 border border-blue-500/30' :
+                                  question.DifficultyLevel === 1 ? 'bg-green-900/30 text-green-300 border border-green-500/30' :
+                                  question.DifficultyLevel === 2 ? 'bg-yellow-900/30 text-yellow-300 border border-yellow-500/30' :
+                                  'bg-red-900/30 text-red-300 border border-red-500/30'
                                 }`}>
                                   {question.DifficultyLevel === 0 ? 'Intern' : 
                                    question.DifficultyLevel === 1 ? 'Junior' : 
                                    question.DifficultyLevel === 2 ? 'Mid' : 'Senior'}
                                 </span>
                                 {isCompleted && (
-                                  <span className="text-xs text-green-600 font-medium">✓</span>
+                                  <span className="text-xs text-green-400 font-medium">✓</span>
                                 )}
                               </div>
                             </div>
@@ -724,10 +756,10 @@ const TextInterviewRoom: React.FC = () => {
                   <div className="w-8 h-8 rounded-lg bg-purple-500 text-white flex items-center justify-center text-sm font-bold mb-2">
                     {currentQuestionIndex + 1}
                   </div>
-                  <div className="text-xs text-gray-500 text-center">
+                  <div className={`text-xs text-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                     {currentQuestionIndex + 1}/{questions.length}
                   </div>
-                  <div className="mt-2 text-xs text-gray-400 text-center">
+                  <div className={`mt-2 text-xs text-center ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
                     Click to expand
                   </div>
                 </div>
@@ -736,9 +768,9 @@ const TextInterviewRoom: React.FC = () => {
           </div>
 
           {/* Right Side - Question and Answer - Full Width */}
-          <div className="flex-1 flex flex-col bg-white">
+          <div className={`flex-1 flex flex-col ${theme === 'dark' ? 'bg-gray-900' : 'bg-white'}`}>
             {/* Current Question Header */}
-            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-8 py-6 text-white">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-8 py-6 text-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -763,7 +795,9 @@ const TextInterviewRoom: React.FC = () => {
             {/* Question and Answer Content */}
             <div className="flex-1 flex flex-col p-8">
               {/* Question Display */}
-              <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-6">
+              <div className={`p-6 rounded-xl border mb-6 ${
+                theme === 'dark' ? 'bg-gray-800 border-gray-600' : 'bg-gray-50 border-gray-200'
+              }`}>
                 <div className="flex items-start space-x-4">
                   <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0 mt-1">
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -771,11 +805,17 @@ const TextInterviewRoom: React.FC = () => {
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <p className="text-xl text-gray-900 leading-relaxed font-medium">{currentQuestion.QuestionText}</p>
+                    <p className={`text-xl leading-relaxed font-medium ${
+                      theme === 'dark' ? 'text-white' : 'text-gray-900'
+                    }`}>{currentQuestion.QuestionText}</p>
                     <div className="flex items-center space-x-4 mt-4">
-                      <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-full shadow-sm border border-gray-200">
-                        <span className="text-sm font-medium text-gray-600">Points:</span>
-                        <span className="text-lg font-bold text-purple-600">{currentQuestion.QuestionMark}</span>
+                      <div className={`flex items-center space-x-2 px-4 py-2 rounded-full shadow-lg border ${
+                        theme === 'dark' ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'
+                      }`}>
+                        <span className={`text-sm font-medium ${
+                          theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                        }`}>Points:</span>
+                        <span className="text-lg font-bold text-purple-400">{currentQuestion.QuestionMark}</span>
                       </div>
                     </div>
                   </div>
@@ -784,16 +824,26 @@ const TextInterviewRoom: React.FC = () => {
 
               {/* Answer Section */}
               <div className="flex-1 flex flex-col">
-                <div className="bg-white border-2 border-gray-200 rounded-xl flex-1 flex flex-col">
-                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-xl">
-                    <label htmlFor="answer" className="block text-lg font-medium text-gray-700">
+                <div className={`border-2 rounded-xl flex-1 flex flex-col ${
+                  theme === 'dark' ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'
+                }`}>
+                  <div className={`px-6 py-4 border-b rounded-t-xl ${
+                    theme === 'dark' ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <label htmlFor="answer" className={`block text-lg font-medium ${
+                      theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                    }`}>
                       Your Answer
                     </label>
                   </div>
                   <div className="flex-1 p-6">
                     <textarea
                       id="answer"
-                      className="w-full h-full resize-none border-0 focus:ring-0 focus:outline-none text-gray-900 placeholder-gray-400 text-lg leading-relaxed"
+                      className={`w-full h-full resize-none border-0 focus:ring-0 focus:outline-none text-lg leading-relaxed ${
+                        theme === 'dark' 
+                          ? 'bg-gray-800 text-white placeholder-gray-400' 
+                          : 'bg-white text-gray-900 placeholder-gray-500'
+                      }`}
                       placeholder="Share your thoughts and expertise..."
                       value={currentAnswer?.UserAnswerText || ''}
                       onChange={(e) => handleAnswerChange(e.target.value)}
@@ -807,7 +857,11 @@ const TextInterviewRoom: React.FC = () => {
                 <button
                   onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
                   disabled={currentQuestionIndex === 0}
-                  className="group px-8 py-4 text-base font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center space-x-3"
+                  className={`group px-8 py-4 text-base font-medium border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center space-x-3 ${
+                    theme === 'dark' 
+                      ? 'text-gray-300 bg-gray-800 border-gray-600 hover:bg-gray-700' 
+                      : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50'
+                  }`}
                 >
                   <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
@@ -817,7 +871,7 @@ const TextInterviewRoom: React.FC = () => {
                 <button
                   onClick={handleSubmitAnswer}
                   disabled={isSubmitting || !currentAnswer?.UserAnswerText}
-                  className="group px-10 py-4 text-base font-medium text-white bg-purple-600 rounded-xl hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center space-x-3"
+                  className="group px-10 py-4 text-base font-medium text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center space-x-3 shadow-lg"
                 >
                   {isSubmitting ? (
                     <>
@@ -843,42 +897,61 @@ const TextInterviewRoom: React.FC = () => {
 
         {/* Error Message */}
         {error && (
-          <div className="p-4 bg-red-50 border-t border-red-200">
+          <div className={`p-4 border-t ${
+            theme === 'dark' ? 'bg-red-900/20 border-red-500/30' : 'bg-red-50 border-red-200'
+          }`}>
             <div className="flex items-center space-x-2">
-              <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-sm text-red-600">{error}</p>
+              <p className={`text-sm ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>{error}</p>
             </div>
           </div>
         )}
 
         {/* Exit Confirmation Modal */}
         {showExitModal && (
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Exit Interview
-              </h3>
-              <p className="text-sm text-gray-600 mb-6">
-                Are you sure you want to exit the interview? Your progress will be saved.
-              </p>
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => setShowExitModal(false)}
-                  className="px-4 py-2 border border-gray-200 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    setShowExitModal(false);
-                    handleInterviewEnd('User exited');
-                  }}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                >
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className={`border rounded-xl p-8 max-w-md w-full shadow-2xl ${
+              theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
+            }`}>
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-900/20 mb-4">
+                  <svg className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <h3 className={`text-xl font-semibold mb-4 ${
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                }`}>
                   Exit Interview
-                </button>
+                </h3>
+                <p className={`mb-8 leading-relaxed ${
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                }`}>
+                  Are you sure you want to exit the interview? Your progress will be saved and you can resume later.
+                </p>
+                <div className="flex justify-center space-x-4">
+                  <button
+                    onClick={() => setShowExitModal(false)}
+                    className={`px-6 py-3 border rounded-lg transition-all duration-200 font-medium ${
+                      theme === 'dark' 
+                        ? 'text-gray-300 bg-gray-800 border-gray-600 hover:bg-gray-700' 
+                        : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowExitModal(false);
+                      handleInterviewEnd('User exited');
+                    }}
+                    className="px-6 py-3 border border-transparent rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all duration-200 font-medium"
+                  >
+                    Exit Interview
+                  </button>
+                </div>
               </div>
             </div>
           </div>
