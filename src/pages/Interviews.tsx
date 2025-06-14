@@ -676,10 +676,19 @@ const Interviews: React.FC = () => {
                         )}
                         {/* Show completion message for finished interviews */}
                         {interview.isFinished && (
-                          <div className="inline-flex items-center px-4 py-2 bg-white dark:bg-green-900/20 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg text-sm font-semibold shadow-sm">
-                            <CheckCircleIcon className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
-                            <span className="font-bold">{interview.mark}%</span>
-                            <span className="ml-1 text-green-600 dark:text-green-400">Score</span>
+                          <div className="flex items-center gap-2">
+                            <div className="inline-flex items-center px-4 py-2 bg-white dark:bg-green-900/20 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg text-sm font-semibold shadow-sm">
+                              <CheckCircleIcon className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
+                              <span className="font-bold">{interview.mark}%</span>
+                              <span className="ml-1 text-green-600 dark:text-green-400">Score</span>
+                            </div>
+                            <button
+                              onClick={() => navigate(`/interview/results/${interview.id}`)}
+                              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-lg text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transform hover:scale-105 transition-all duration-200 ease-in-out"
+                            >
+                              <EyeIcon className="h-4 w-4 mr-2" />
+                              View Results
+                            </button>
                           </div>
                         )}
                       </div>

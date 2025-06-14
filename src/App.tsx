@@ -19,6 +19,7 @@ import Resumes from './pages/Resumes';
 import Interviews from './pages/Interviews';
 import TextInterviewRoom from './pages/TextInterviewRoom';
 import InterviewRoom from './pages/InterviewRoom';
+import InterviewResults from './pages/InterviewResults';
 import AboutUs from './pages/AboutUs';
 import Features from './pages/Features';
 
@@ -49,6 +50,7 @@ const App: React.FC = () => {
                 <Route path="/interview/text/:interviewId" element={<TextInterviewRoom />} />
                 <Route path="/interview/voice/:interviewId" element={<InterviewRoom />} />
                 <Route path="/interview/room/:interviewId" element={<InterviewRoom />} />
+                <Route path="/interview/results/:interviewId" element={<AuthenticatedLayout><InterviewResults /></AuthenticatedLayout>} />
             </Routes>
           </SidebarProvider>
         </Router>

@@ -34,6 +34,9 @@ const TextInterviewRoom: React.FC = () => {
   const [isQuestionsPanelCollapsed, setIsQuestionsPanelCollapsed] = useState(false);
   const [completedQuestions, setCompletedQuestions] = useState<Set<number>>(new Set());
   const [showExitModal, setShowExitModal] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
+  const [showCompletionAlert, setShowCompletionAlert] = useState(false);
+  const [completionMessage, setCompletionMessage] = useState('');
 
   useEffect(() => {
     fetchInterviewQuestions();
@@ -336,10 +339,13 @@ const TextInterviewRoom: React.FC = () => {
         if (result.interview_completed) {
           // Interview is completed
           console.log('Interview completed:', result.message);
-          setSuccess('Excellent! Your answer was comprehensive. Interview completed successfully.');
+          const farewellMessage = result.farewell_message || result.message || 'Thank you, you\'ve completed all questions. We will review your answers.';
+          setCompletionMessage(farewellMessage);
+          setShowCompletionAlert(true);
           setTimeout(() => {
+            setShowCompletionAlert(false);
             handleInterviewEnd('Interview completed - all questions answered satisfactorily');
-          }, 2000);
+          }, 4000); // Give user time to read the completion message
           return;
         } else if (result.next_question_id) {
           // Move to the next main question
@@ -469,6 +475,9 @@ const TextInterviewRoom: React.FC = () => {
 
   const handleInterviewEnd = async (reason: string) => {
     console.log(`Interview ended: ${reason}`);
+    
+    // Set loading state for exit button
+    setIsExiting(true);
 
     try {
       // Only call the backend to mark the interview as finished if it's not already completed by AI
@@ -493,6 +502,9 @@ const TextInterviewRoom: React.FC = () => {
       }
     } catch (error) {
       console.error('Error ending interview:', error);
+    } finally {
+      // Reset loading state
+      setIsExiting(false);
     }
 
     // Navigate to interviews page
@@ -703,16 +715,29 @@ const TextInterviewRoom: React.FC = () => {
             </div>
             <button
               onClick={() => setShowExitModal(true)}
+              disabled={isExiting}
               className={`inline-flex items-center px-3 py-1.5 border focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all duration-200 ${
                 theme === 'dark' ?
-                  'border-red-500/30 rounded-lg text-sm font-medium text-red-400 bg-red-900/20 hover:bg-red-900/40 '
-                  : 'border-red-500/30 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 '
+                  'border-red-500/30 rounded-lg text-sm font-medium text-red-400 bg-red-900/20 hover:bg-red-900/40 disabled:opacity-50 disabled:cursor-not-allowed'
+                  : 'border-red-500/30 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed'
               }`}
             >
-            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            <span>Exit</span>
+            {isExiting ? (
+              <>
+                <svg className="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Exiting...</span>
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span>Exit</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -1032,7 +1057,8 @@ const TextInterviewRoom: React.FC = () => {
               <div className="flex justify-center space-x-4">
                 <button
                   onClick={() => setShowExitModal(false)}
-                  className={`px-6 py-3 border rounded-lg transition-all duration-200 font-medium ${theme === 'dark'
+                  disabled={isExiting}
+                  className={`px-6 py-3 border rounded-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed ${theme === 'dark'
                       ? 'text-gray-300 bg-gray-800 border-gray-600 hover:bg-gray-700'
                       : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50'
                     }`}
@@ -1044,9 +1070,55 @@ const TextInterviewRoom: React.FC = () => {
                     setShowExitModal(false);
                     handleInterviewEnd('User exited');
                   }}
-                  className="px-6 py-3 border border-transparent rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all duration-200 font-medium"
+                  disabled={isExiting}
+                  className="px-6 py-3 border border-transparent rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Exit Interview
+                  {isExiting ? (
+                    <div className="flex items-center space-x-2">
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Exiting...</span>
+                    </div>
+                  ) : (
+                    'Exit Interview'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Completion Alert */}
+      {showCompletionAlert && (
+        <div className={`fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50`}>
+          <div className={`border rounded-xl p-8 max-w-md w-full shadow-2xl ${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
+            }`}>
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-900/20 mb-4">
+                <svg className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className={`text-xl font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                }`}>
+                Interview Completed
+              </h3>
+              <p className={`mb-8 leading-relaxed ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                }`}>
+                {completionMessage}
+              </p>
+              <div className="flex justify-center space-x-4">
+                <button
+                  onClick={() => {
+                    setShowCompletionAlert(false);
+                    handleInterviewEnd('Interview completed - all questions answered satisfactorily');
+                  }}
+                  className="px-6 py-3 border border-transparent rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500/50 transition-all duration-200 font-medium"
+                >
+                  Continue
                 </button>
               </div>
             </div>
