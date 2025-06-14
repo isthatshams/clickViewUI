@@ -435,49 +435,24 @@ const Interviews: React.FC = () => {
   const handleSummaryInterview = async (interview: MockInterview) => {
     try {
       setIsLoadingSummary(true);
-      setError(null);
-      
       const token = await getValidToken();
-      
-      // Get interview details
-      const detailsResponse = await fetch(`https://localhost:7127/api/Interview/${interview.id}`, {
+
+      const response = await fetch(`https://localhost:7127/api/Interview/${interview.id}/summary`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
 
-      if (!detailsResponse.ok) {
-        throw new Error('Failed to get interview details');
+      if (response.ok) {
+        const summary = await response.json();
+        setInterviewSummary(summary);
+        setShowPreviewModal(true);
+      } else {
+        console.error('Failed to fetch interview summary');
       }
-
-      const details = await detailsResponse.json();
-      
-      // Get AI summary if available
-      const summaryResponse = await fetch(`https://localhost:7127/api/Interview/${interview.id}/summary/ai`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-    },
-      });
-
-      let feedback = null;
-      if (summaryResponse.ok) {
-        feedback = await summaryResponse.json();
-      }
-
-      setSelectedInterview({
-        ...interview,
-        questions: details.questions,
-        answers: details.answers,
-        feedback: feedback
-      });
-      
-      setInterviewSummary(feedback);
-      setShowPreviewModal(true);
     } catch (error) {
-      console.error('Error getting interview summary:', error);
-      setError('Failed to load interview summary');
+      console.error('Error fetching interview summary:', error);
     } finally {
       setIsLoadingSummary(false);
     }
@@ -529,29 +504,7 @@ const Interviews: React.FC = () => {
                 return (
                   <div 
                     key={interview.id} 
-                    className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer hover:border-purple-300 dark:hover:border-purple-600 group"
-                    onClick={() => {
-                      console.log('Interview clicked:', {
-                        id: interview.id,
-                        isFinished: interview.isFinished,
-                        status: interview.status,
-                        interviewType: interview.interviewType
-                      });
-                      
-                      // For completed interviews, navigate to details page
-                      if (interview.isFinished) {
-                        console.log('Navigating to details page for completed interview');
-                        navigate(`/interview/details/${interview.id}`);
-                      } else {
-                        console.log('Navigating to interview room for ongoing interview');
-                        // For ongoing interviews, navigate to the interview room
-                        if (interview.interviewType === 0) {
-                          navigate(`/interview/text/${interview.id}`);
-                        } else {
-                          navigate(`/interview/voice/${interview.id}`);
-                        }
-                      }
-                    }}
+                    className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm transition-all duration-200"
                   >
                     <div className="flex items-start justify-between">
                       {/* Left side - Main info */}
@@ -576,12 +529,12 @@ const Interviews: React.FC = () => {
                           {interview.mark > 0 && (
                             <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 border border-yellow-200">
                               <StarIcon className="h-3 w-3 mr-1" />
-                              {interview.mark}% Score
+                              {interview.mark.toFixed(2)}% Score
                             </div>
                           )}
                         </div>
                         
-                        <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                        <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
                           {interview.title}
                         </h3>
                         
@@ -614,27 +567,10 @@ const Interviews: React.FC = () => {
                             <span>{interview.answerCount} Answered</span>
                           </div>
                         </div>
-                        
-                        {/* Click hint */}
-                        <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {interview.isFinished ? 'Click to view interview details' : 'Click to view full interview'}
-                        </div>
                       </div>
                       
                       {/* Right side - Actions */}
-                      <div className="flex items-center gap-2 ml-4" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => interview.answerCount > 0 && handleSummaryInterview(interview)}
-                          disabled={interview.answerCount === 0}
-                          className={`p-2 rounded-lg transition-colors ${
-                            interview.answerCount === 0
-                              ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
-                              : 'text-gray-600 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20'
-                          }`}
-                          title={interview.answerCount === 0 ? "No answers to summarize" : "Summary"}
-                        >
-                          <ChartBarIcon className="h-5 w-5" />
-                        </button>
+                      <div className="flex items-center gap-2 ml-4">
                         {/* Show Start Interview button only for scheduled interviews that haven't finished */}
                         {interview.status === 'scheduled' && !interview.isFinished && (
                           <button
@@ -677,18 +613,72 @@ const Interviews: React.FC = () => {
                         {/* Show completion message for finished interviews */}
                         {interview.isFinished && (
                           <div className="flex items-center gap-2">
-                            <div className="inline-flex items-center px-4 py-2 bg-white dark:bg-green-900/20 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg text-sm font-semibold shadow-sm">
-                              <CheckCircleIcon className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
-                              <span className="font-bold">{interview.mark}%</span>
-                              <span className="ml-1 text-green-600 dark:text-green-400">Score</span>
-                            </div>
-                            <button
-                              onClick={() => navigate(`/interview/results/${interview.id}`)}
-                              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-lg text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transform hover:scale-105 transition-all duration-200 ease-in-out"
-                            >
-                              <EyeIcon className="h-4 w-4 mr-2" />
-                              View Results
-                            </button>
+                            {interview.mark > 0 ? (
+                              <>
+                                <div className="inline-flex items-center px-4 py-2 bg-white dark:bg-green-900/20 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg text-sm font-semibold shadow-sm">
+                                  <CheckCircleIcon className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
+                                  <span className="font-bold">{interview.mark.toFixed(2)}%</span>
+                                </div>
+                                <button
+                                  onClick={() => navigate(`/interview/results/${interview.id}`)}
+                                  className={`inline-flex items-center px-4 py-2 border-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                                    theme === 'dark'
+                                      ? 'text-gray-300 bg-gray-800 border-purple-500 hover:bg-gray-700 focus:ring-purple-500'
+                                      : 'text-black bg-gray-100 border-purple-500 hover:bg-gray-200 focus:ring-purple-500'
+                                  }`}
+                                >
+                                  <EyeIcon className="h-4 w-4 mr-2" />
+                                  View Results
+                                </button>
+                              </>
+                            ) : interview.answerCount > 0 ? (
+                              <>
+                                <div className="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-semibold shadow-sm">
+                                  <ExclamationTriangleIcon className="h-4 w-4 mr-2 text-gray-600 dark:text-gray-400" />
+                                  <span>No Score</span>
+                                </div>
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const token = await getValidToken();
+                                      const response = await fetch(`https://localhost:7127/api/Interview/calculate-score/${interview.id}`, {
+                                        method: 'POST',
+                                        headers: {
+                                          'Authorization': `Bearer ${token}`,
+                                          'Content-Type': 'application/json',
+                                        },
+                                      });
+
+                                      if (response.ok) {
+                                        const result = await response.json();
+                                        console.log('Score calculated:', result);
+                                        await fetchInterviews(); // Refresh the list
+                                        alert(`Score calculated: ${result.score.toFixed(2)}% (${result.grade})`);
+                                      } else {
+                                        const errorData = await response.json();
+                                        alert(`Failed to calculate score: ${errorData.error || 'Unknown error'}`);
+                                      }
+                                    } catch (error) {
+                                      console.error('Error calculating score:', error);
+                                      alert('Error calculating score. Please try again.');
+                                    }
+                                  }}
+                                  className={`inline-flex items-center px-4 py-2 border-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                                    theme === 'dark'
+                                      ? 'text-gray-300 bg-gray-800 border-orange-500 hover:bg-gray-700 focus:ring-orange-500'
+                                      : 'text-black bg-gray-100 border-orange-500 hover:bg-gray-200 focus:ring-orange-500'
+                                  }`}
+                                >
+                                  <StarIcon className="h-4 w-4 mr-2" />
+                                  Calculate Score
+                                </button>
+                              </>
+                            ) : (
+                              <div className="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-semibold shadow-sm">
+                                <ExclamationTriangleIcon className="h-4 w-4 mr-2 text-gray-600 dark:text-gray-400" />
+                                <span>No Score</span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -745,59 +735,77 @@ const Interviews: React.FC = () => {
                   </div>
                 </div>
 
-                {/* CV Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Select CV (Optional)
-                  </label>
-                  {isLoadingCVs ? (
-                    <div className="text-gray-600 dark:text-gray-400">Loading CVs...</div>
-                  ) : (
+                {/* CV Selection and Job Title - Only show for Chat interviews */}
+                {interviewType === 'Chat' ? (
+                  <>
+                    {/* CV Selection */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Select CV (Optional)
+                      </label>
+                      {isLoadingCVs ? (
+                        <div className="text-gray-600 dark:text-gray-400">Loading CVs...</div>
+                      ) : (
+                        <select
+                          value={selectedCV}
+                          onChange={(e) => setSelectedCV(e.target.value)}
+                          className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        >
+                          <option value="">No CV</option>
+                          {availableCVs.map((cv) => (
+                            <option key={cv.id} value={cv.id}>
+                              {cv.title} {cv.isDefault ? '(Default)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
+                    {/* Job Title */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Job Title
+                      </label>
+                      <input
+                        type="text"
+                        value={jobTitle}
+                        onChange={(e) => setJobTitle(e.target.value)}
+                        placeholder="e.g., Software Developer"
+                        className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  /* Future Work message for Voice interviews */
+                  <div className="text-center py-8">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">Future Work</h3>
+                    <p className="text-gray-600 dark:text-gray-400">Voice interview configuration is coming soon.</p>
+                  </div>
+                )}
+
+                {/* Interview Level - Only show for Chat interviews */}
+                {interviewType === 'Chat' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Interview Level
+                    </label>
                     <select
-                      value={selectedCV}
-                      onChange={(e) => setSelectedCV(e.target.value)}
+                      value={interviewLevel}
+                      onChange={(e) => setInterviewLevel(e.target.value)}
                       className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                     >
-                      <option value="">No CV</option>
-                      {availableCVs.map((cv) => (
-                        <option key={cv.id} value={cv.id}>
-                          {cv.title} {cv.isDefault ? '(Default)' : ''}
-                        </option>
-                      ))}
+                      <option value="internship">Internship</option>
+                      <option value="junior">Junior</option>
+                      <option value="mid">Mid-Level</option>
+                      <option value="senior">Senior</option>
                     </select>
-                  )}
-                </div>
-
-                {/* Job Title */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Job Title
-                  </label>
-                  <input
-                    type="text"
-                    value={jobTitle}
-                    onChange={(e) => setJobTitle(e.target.value)}
-                    placeholder="e.g., Software Developer"
-                    className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  />
-                </div>
-
-                {/* Interview Level */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Interview Level
-                  </label>
-                  <select
-                    value={interviewLevel}
-                    onChange={(e) => setInterviewLevel(e.target.value)}
-                    className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  >
-                    <option value="internship">Internship</option>
-                    <option value="junior">Junior</option>
-                    <option value="mid">Mid-Level</option>
-                    <option value="senior">Senior</option>
-                  </select>
-                </div>
+                  </div>
+                )}
               </div>
 
               <div className="mt-6 flex justify-end space-x-3">
@@ -809,7 +817,7 @@ const Interviews: React.FC = () => {
                 </button>
                 <button
                   onClick={handleStartInterview}
-                  disabled={isScheduling}
+                  disabled={isScheduling || interviewType === 'Voice'}
                   className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isScheduling ? (
@@ -926,7 +934,7 @@ const Interviews: React.FC = () => {
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                        {selectedInterview.mark}%
+                        {selectedInterview.mark.toFixed(2)}%
                       </div>
                       <div className="text-xs text-gray-600 dark:text-gray-400">Score</div>
                     </div>
@@ -1180,7 +1188,7 @@ const Interviews: React.FC = () => {
                   className={`px-4 py-2 border rounded-md text-sm font-medium transition-all duration-200 ${
                     theme === 'dark' 
                       ? 'border-gray-600 text-gray-300 bg-gray-800 hover:bg-gray-700' 
-                      : 'border-gray-200 text-gray-700 bg-white hover:bg-gray-50'
+                      : 'border-gray-200 text-gray-700 bg-gray-100 hover:bg-gray-200'
                   }`}
                 >
                   Close

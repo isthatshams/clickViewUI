@@ -43,6 +43,8 @@ interface InterviewData {
   StartedAt: string;
   FinishedAt?: string;
   IsFinished: boolean;
+  ScoreGrade?: string;
+  ScoreFeedback?: string;
   Questions: Question[];
   Answers: Answer[];
 }
@@ -56,6 +58,46 @@ interface InterviewSummary {
   SuggestedImprovements: string[];
 }
 
+interface ScoreBreakdown {
+  InterviewId: number;
+  TotalScore: number;
+  Grade: string;
+  Feedback: string;
+  ScoreComponents: {
+    Completion: {
+      Score: number;
+      Weight: number;
+      WeightedScore: number;
+      Description: string;
+    };
+    Quality: {
+      Score: number;
+      Weight: number;
+      WeightedScore: number;
+      Description: string;
+    };
+    Difficulty: {
+      Score: number;
+      Weight: number;
+      WeightedScore: number;
+      Description: string;
+    };
+    TimeEfficiency: {
+      Score: number;
+      Weight: number;
+      WeightedScore: number;
+      Description: string;
+    };
+  };
+  InterviewDetails: {
+    TotalQuestions: number;
+    AnsweredQuestions: number;
+    CompletionRate: number;
+    Duration: number;
+    AverageTimePerAnswer: number;
+  };
+}
+
 const InterviewResults: React.FC = () => {
   const { interviewId } = useParams<{ interviewId: string }>();
   const navigate = useNavigate();
@@ -63,6 +105,7 @@ const InterviewResults: React.FC = () => {
   const [interview, setInterview] = useState<InterviewData | null>(null);
   const [feedback, setFeedback] = useState<FeedbackReport | null>(null);
   const [summary, setSummary] = useState<InterviewSummary | null>(null);
+  const [scoreBreakdown, setScoreBreakdown] = useState<ScoreBreakdown | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,6 +147,17 @@ const InterviewResults: React.FC = () => {
         if (feedbackResponse.ok) {
           const feedbackData = await feedbackResponse.json();
           setFeedback(feedbackData);
+          console.log('Feedback data loaded successfully:', feedbackData);
+        } else {
+          const errorText = await feedbackResponse.text();
+          console.warn(`Feedback endpoint returned ${feedbackResponse.status}: ${errorText}`);
+          
+          // If it's a 400 error (no answers), we can handle it gracefully
+          if (feedbackResponse.status === 400) {
+            console.log('No answers available for feedback generation');
+          } else {
+            console.error('Failed to fetch feedback:', feedbackResponse.status, errorText);
+          }
         }
       } catch (feedbackError) {
         console.warn('Failed to fetch feedback:', feedbackError);
@@ -124,6 +178,27 @@ const InterviewResults: React.FC = () => {
         }
       } catch (summaryError) {
         console.warn('Failed to fetch AI summary:', summaryError);
+      }
+
+      // Fetch score breakdown
+      try {
+        const scoreResponse = await fetch(`https://localhost:7127/api/Interview/${interviewId}/score-breakdown`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (scoreResponse.ok) {
+          const scoreData = await scoreResponse.json();
+          setScoreBreakdown(scoreData);
+          console.log('Score breakdown loaded successfully:', scoreData);
+        } else {
+          const errorText = await scoreResponse.text();
+          console.warn(`Score breakdown endpoint returned ${scoreResponse.status}: ${errorText}`);
+        }
+      } catch (scoreError) {
+        console.warn('Failed to fetch score breakdown:', scoreError);
       }
 
     } catch (error) {
@@ -205,10 +280,12 @@ const InterviewResults: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className={`flex items-center justify-center min-h-screen ${theme === 'dark' ? 'bg-black' : 'bg-gray-100'}`}>
-        <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-purple-500"></div>
-          <p className={`text-lg ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Loading interview results...</p>
+      <div className="flex-1 p-6 px-6 bg-gray-100 dark:bg-gray-900">
+        <div className="flex items-center justify-center min-h-96">
+          <div className="flex flex-col items-center space-y-4">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-purple-500"></div>
+            <p className={`text-lg ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Loading interview results...</p>
+          </div>
         </div>
       </div>
     );
@@ -216,14 +293,16 @@ const InterviewResults: React.FC = () => {
 
   if (error) {
     return (
-      <div className={`flex items-center justify-center min-h-screen ${theme === 'dark' ? 'bg-black' : 'bg-gray-100'}`}>
-        <div className={`p-8 rounded-lg border max-w-md w-full ${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`}>
-          <div className="text-red-400 text-center">
-            <svg className="mx-auto h-12 w-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-            <p className="text-lg font-semibold mb-2">Error</p>
-            <p className="text-sm">{error}</p>
+      <div className="flex-1 p-6 px-6 bg-gray-100 dark:bg-gray-900">
+        <div className="flex items-center justify-center min-h-96">
+          <div className={`p-8 rounded-lg border max-w-md w-full ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+            <div className="text-red-400 text-center">
+              <svg className="mx-auto h-12 w-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <p className="text-lg font-semibold mb-2">Error</p>
+              <p className="text-sm">{error}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -232,10 +311,12 @@ const InterviewResults: React.FC = () => {
 
   if (!interview) {
     return (
-      <div className={`flex items-center justify-center min-h-screen ${theme === 'dark' ? 'bg-black' : 'bg-gray-100'}`}>
-        <div className={`p-8 rounded-lg border max-w-md w-full ${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`}>
-          <div className="text-center">
-            <p className={`text-lg ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Interview not found</p>
+      <div className="flex-1 p-6 px-6 bg-gray-100 dark:bg-gray-900">
+        <div className="flex items-center justify-center min-h-96">
+          <div className={`p-8 rounded-lg border max-w-md w-full ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+            <div className="text-center">
+              <p className={`text-lg ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Interview not found</p>
+            </div>
           </div>
         </div>
       </div>
@@ -245,14 +326,10 @@ const InterviewResults: React.FC = () => {
   const questionsInOrder = getQuestionsInOrder();
 
   return (
-    <div className={`min-h-screen ${theme === 'dark' ? 'bg-black text-white' : 'bg-gray-100 text-gray-900'}`}>
-      <div className="max-w-6xl mx-auto p-6">
+    <div className="flex-1 p-6 px-6 bg-gray-100 dark:bg-gray-900">
+      <div className="w-full mx-auto flex flex-col gap-6">
         {/* Header */}
-        <div className={`border p-6 rounded-xl shadow-2xl mb-8 ${
-          theme === 'dark' 
-            ? 'bg-gray-900 border-gray-700' 
-            : 'bg-white border-gray-200'
-        }`}>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
           <div className="flex justify-between items-start">
             <div>
               <div className="flex items-center space-x-4 mb-4">
@@ -260,7 +337,7 @@ const InterviewResults: React.FC = () => {
                   onClick={() => navigate('/interviews')}
                   className={`p-2 rounded-lg transition-colors ${
                     theme === 'dark' 
-                      ? 'text-gray-400 hover:text-white hover:bg-gray-800' 
+                      ? 'text-gray-400 hover:text-white hover:bg-gray-700' 
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
@@ -268,9 +345,7 @@ const InterviewResults: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                <h1 className={`text-3xl font-bold ${
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                }`}>
+                <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                   Interview Results
                 </h1>
               </div>
@@ -300,41 +375,27 @@ const InterviewResults: React.FC = () => {
             </div>
             
             <div className="text-right">
-              <div className={`text-2xl font-bold mb-1 ${
-                theme === 'dark' ? 'text-white' : 'text-gray-900'
-              }`}>
+              <div className={`text-3xl font-bold mb-1 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                 {interview.InterviewMark}%
               </div>
-              <div className={`text-sm ${
-                theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-              }`}>Score</div>
+              <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Score</div>
             </div>
           </div>
         </div>
 
         {/* Feedback Section */}
         {feedback && (
-          <div className={`border p-6 rounded-xl shadow-2xl mb-8 ${
-            theme === 'dark' 
-              ? 'bg-gray-900 border-gray-700' 
-              : 'bg-white border-gray-200'
-          }`}>
-            <h2 className={`text-2xl font-bold mb-6 ${
-              theme === 'dark' ? 'text-white' : 'text-gray-900'
-            }`}>
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+            <h2 className={`text-xl font-semibold mb-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
               AI Feedback Report
             </h2>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
-                <h3 className={`text-lg font-semibold mb-3 ${
-                  theme === 'dark' ? 'text-green-400' : 'text-green-600'
-                }`}>
+                <h3 className={`text-lg font-semibold mb-3 ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
                   Strengths
                 </h3>
-                <div className={`p-4 rounded-lg ${
-                  theme === 'dark' ? 'bg-green-900/20 border border-green-500/30' : 'bg-green-50 border border-green-200'
-                }`}>
+                <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-green-900/20 border border-green-500/30' : 'bg-green-50 border border-green-200'}`}>
                   <p className={`${theme === 'dark' ? 'text-green-300' : 'text-green-800'}`}>
                     {feedback.Strengths}
                   </p>
@@ -342,14 +403,10 @@ const InterviewResults: React.FC = () => {
               </div>
               
               <div>
-                <h3 className={`text-lg font-semibold mb-3 ${
-                  theme === 'dark' ? 'text-red-400' : 'text-red-600'
-                }`}>
+                <h3 className={`text-lg font-semibold mb-3 ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>
                   Areas for Improvement
                 </h3>
-                <div className={`p-4 rounded-lg ${
-                  theme === 'dark' ? 'bg-red-900/20 border border-red-500/30' : 'bg-red-50 border border-red-200'
-                }`}>
+                <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-red-900/20 border border-red-500/30' : 'bg-red-50 border border-red-200'}`}>
                   <p className={`${theme === 'dark' ? 'text-red-300' : 'text-red-800'}`}>
                     {feedback.Weaknesses}
                   </p>
@@ -358,14 +415,10 @@ const InterviewResults: React.FC = () => {
             </div>
             
             <div className="mt-6">
-              <h3 className={`text-lg font-semibold mb-3 ${
-                theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
-              }`}>
+              <h3 className={`text-lg font-semibold mb-3 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
                 Personality Summary
               </h3>
-              <div className={`p-4 rounded-lg ${
-                theme === 'dark' ? 'bg-blue-900/20 border border-blue-500/30' : 'bg-blue-50 border border-blue-200'
-              }`}>
+              <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-blue-900/20 border border-blue-500/30' : 'bg-blue-50 border border-blue-200'}`}>
                 <p className={`${theme === 'dark' ? 'text-blue-300' : 'text-blue-800'}`}>
                   {feedback.PersonalitySummary}
                 </p>
@@ -374,14 +427,10 @@ const InterviewResults: React.FC = () => {
             
             {feedback.Recommendation && (
               <div className="mt-6">
-                <h3 className={`text-lg font-semibold mb-3 ${
-                  theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
-                }`}>
+                <h3 className={`text-lg font-semibold mb-3 ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`}>
                   Recommendation
                 </h3>
-                <div className={`p-4 rounded-lg ${
-                  theme === 'dark' ? 'bg-purple-900/20 border border-purple-500/30' : 'bg-purple-50 border border-purple-200'
-                }`}>
+                <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-purple-900/20 border border-purple-500/30' : 'bg-purple-50 border border-purple-200'}`}>
                   <p className={`${theme === 'dark' ? 'text-purple-300' : 'text-purple-800'}`}>
                     {feedback.Recommendation}
                   </p>
@@ -393,27 +442,17 @@ const InterviewResults: React.FC = () => {
 
         {/* AI Summary Section */}
         {summary && (
-          <div className={`border p-6 rounded-xl shadow-2xl mb-8 ${
-            theme === 'dark' 
-              ? 'bg-gray-900 border-gray-700' 
-              : 'bg-white border-gray-200'
-          }`}>
-            <h2 className={`text-2xl font-bold mb-6 ${
-              theme === 'dark' ? 'text-white' : 'text-gray-900'
-            }`}>
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+            <h2 className={`text-xl font-semibold mb-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
               AI Analysis Summary
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div>
-                <h3 className={`text-lg font-semibold mb-3 ${
-                  theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'
-                }`}>
+                <h3 className={`text-lg font-semibold mb-3 ${theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`}>
                   Overall Tone
                 </h3>
-                <div className={`p-3 rounded-lg ${
-                  theme === 'dark' ? 'bg-indigo-900/20 border border-indigo-500/30' : 'bg-indigo-50 border border-indigo-200'
-                }`}>
+                <div className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-indigo-900/20 border border-indigo-500/30' : 'bg-indigo-50 border border-indigo-200'}`}>
                   <p className={`${theme === 'dark' ? 'text-indigo-300' : 'text-indigo-800'}`}>
                     {summary.OverallTone}
                   </p>
@@ -421,19 +460,13 @@ const InterviewResults: React.FC = () => {
               </div>
               
               <div>
-                <h3 className={`text-lg font-semibold mb-3 ${
-                  theme === 'dark' ? 'text-green-400' : 'text-green-600'
-                }`}>
+                <h3 className={`text-lg font-semibold mb-3 ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
                   Dominant Personality Traits
                 </h3>
-                <div className={`p-3 rounded-lg ${
-                  theme === 'dark' ? 'bg-green-900/20 border border-green-500/30' : 'bg-green-50 border border-green-200'
-                }`}>
+                <div className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-green-900/20 border border-green-500/30' : 'bg-green-50 border border-green-200'}`}>
                   <div className="flex flex-wrap gap-2">
                     {summary.DominantPersonalityTraits.map((trait, index) => (
-                      <span key={index} className={`px-2 py-1 rounded-full text-xs ${
-                        theme === 'dark' ? 'bg-green-800/50 text-green-200' : 'bg-green-200 text-green-800'
-                      }`}>
+                      <span key={index} className={`px-2 py-1 rounded-full text-xs ${theme === 'dark' ? 'bg-green-800/50 text-green-200' : 'bg-green-200 text-green-800'}`}>
                         {trait}
                       </span>
                     ))}
@@ -442,19 +475,13 @@ const InterviewResults: React.FC = () => {
               </div>
               
               <div>
-                <h3 className={`text-lg font-semibold mb-3 ${
-                  theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
-                }`}>
+                <h3 className={`text-lg font-semibold mb-3 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
                   Key Soft Skills
                 </h3>
-                <div className={`p-3 rounded-lg ${
-                  theme === 'dark' ? 'bg-blue-900/20 border border-blue-500/30' : 'bg-blue-50 border border-blue-200'
-                }`}>
+                <div className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-blue-900/20 border border-blue-500/30' : 'bg-blue-50 border border-blue-200'}`}>
                   <div className="flex flex-wrap gap-2">
                     {summary.DominantSoftSkills.map((skill, index) => (
-                      <span key={index} className={`px-2 py-1 rounded-full text-xs ${
-                        theme === 'dark' ? 'bg-blue-800/50 text-blue-200' : 'bg-blue-200 text-blue-800'
-                      }`}>
+                      <span key={index} className={`px-2 py-1 rounded-full text-xs ${theme === 'dark' ? 'bg-blue-800/50 text-blue-200' : 'bg-blue-200 text-blue-800'}`}>
                         {skill}
                       </span>
                     ))}
@@ -466,98 +493,60 @@ const InterviewResults: React.FC = () => {
         )}
 
         {/* Questions and Answers Section */}
-        <div className={`border p-6 rounded-xl shadow-2xl ${
-          theme === 'dark' 
-            ? 'bg-gray-900 border-gray-700' 
-            : 'bg-white border-gray-200'
-        }`}>
-          <h2 className={`text-2xl font-bold mb-6 ${
-            theme === 'dark' ? 'text-white' : 'text-gray-900'
-          }`}>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+          <h2 className={`text-xl font-semibold mb-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
             Questions & Answers
           </h2>
           
-          <div className="space-y-8">
+          <div className="space-y-6">
             {questionsInOrder.map((question, index) => {
               const answer = getAnswerForQuestion(question.QuestionId);
               const isMainQuestion = !question.ParentQuestionId;
               
               return (
-                <div key={question.QuestionId} className={`border rounded-xl p-6 ${
-                  theme === 'dark' 
-                    ? 'bg-gray-800 border-gray-600' 
-                    : 'bg-gray-50 border-gray-200'
-                }`}>
+                <div key={question.QuestionId} className={`border rounded-lg p-6 ${theme === 'dark' ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
                   <div className="flex items-start space-x-4">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                      isMainQuestion 
-                        ? 'bg-purple-500 text-white' 
-                        : 'bg-blue-500 text-white'
-                    }`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${isMainQuestion ? 'bg-purple-500 text-white' : 'bg-blue-500 text-white'}`}>
                       {getQuestionLabel(question, index)}
                     </div>
                     
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-3">
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          getDifficultyColor(question.DifficultyLevel)
-                        }`}>
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getDifficultyColor(question.DifficultyLevel)}`}>
                           {getDifficultyLabel(question.DifficultyLevel)}
                         </span>
-                        <span className={`text-sm ${
-                          theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-                        }`}>
+                        <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                           {question.QuestionMark} points
                         </span>
                       </div>
                       
-                      <h3 className={`text-lg font-semibold mb-4 ${
-                        theme === 'dark' ? 'text-white' : 'text-gray-900'
-                      }`}>
+                      <h3 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                         {question.QuestionText}
                       </h3>
                       
                       {answer ? (
-                        <div className={`p-4 rounded-lg ${
-                          theme === 'dark' 
-                            ? 'bg-gray-700 border border-gray-600' 
-                            : 'bg-white border border-gray-300'
-                        }`}>
-                          <h4 className={`font-medium mb-2 ${
-                            theme === 'dark' ? 'text-green-400' : 'text-green-600'
-                          }`}>
+                        <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-600 border border-gray-500' : 'bg-white border border-gray-300'}`}>
+                          <h4 className={`font-medium mb-2 ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
                             Your Answer:
                           </h4>
-                          <p className={`leading-relaxed ${
-                            theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
-                          }`}>
+                          <p className={`leading-relaxed ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                             {answer.UserAnswerText}
                           </p>
                           
                           {answer.UserAnswerNotes && (
                             <div className="mt-4 pt-4 border-t border-gray-600">
-                              <h5 className={`font-medium mb-2 ${
-                                theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
-                              }`}>
+                              <h5 className={`font-medium mb-2 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
                                 Notes:
                               </h5>
-                              <p className={`text-sm ${
-                                theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-                              }`}>
+                              <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                                 {answer.UserAnswerNotes}
                               </p>
                             </div>
                           )}
                         </div>
                       ) : (
-                        <div className={`p-4 rounded-lg ${
-                          theme === 'dark' 
-                            ? 'bg-gray-700 border border-gray-600' 
-                            : 'bg-white border border-gray-300'
-                        }`}>
-                          <p className={`italic ${
-                            theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                          }`}>
+                        <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-600 border border-gray-500' : 'bg-white border border-gray-300'}`}>
+                          <p className={`italic ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                             No answer provided
                           </p>
                         </div>
@@ -574,4 +563,4 @@ const InterviewResults: React.FC = () => {
   );
 };
 
-export default InterviewResults; 
+export default InterviewResults;
